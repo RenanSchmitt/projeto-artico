@@ -1,0 +1,7 @@
+project_id = "vhqeminwmhifeqampbnh"
+
+[functions.seed]
+verify_jwt = false
+
+[functions.simulate-tick]
+verify_jwt = false
