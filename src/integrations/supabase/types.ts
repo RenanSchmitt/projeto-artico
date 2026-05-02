@@ -14,16 +14,201 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alarms: {
+        Row: {
+          chamber_id: string
+          created_at: string
+          id: string
+          message: string
+          severity: string
+        }
+        Insert: {
+          chamber_id: string
+          created_at?: string
+          id?: string
+          message: string
+          severity?: string
+        }
+        Update: {
+          chamber_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alarms_chamber_id_fkey"
+            columns: ["chamber_id"]
+            isOneToOne: false
+            referencedRelation: "chambers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chambers: {
+        Row: {
+          created_at: string
+          id: string
+          location: string | null
+          max_temp: number
+          min_temp: number
+          name: string
+          setpoint: number
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          max_temp?: number
+          min_temp?: number
+          name: string
+          setpoint?: number
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          max_temp?: number
+          min_temp?: number
+          name?: string
+          setpoint?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chambers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          tenant_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id: string
+          tenant_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telemetry: {
+        Row: {
+          chamber_id: string
+          compressor_on: boolean
+          defrost_on: boolean
+          door_open: boolean
+          id: string
+          recorded_at: string
+          temperature: number
+        }
+        Insert: {
+          chamber_id: string
+          compressor_on?: boolean
+          defrost_on?: boolean
+          door_open?: boolean
+          id?: string
+          recorded_at?: string
+          temperature: number
+        }
+        Update: {
+          chamber_id?: string
+          compressor_on?: boolean
+          defrost_on?: boolean
+          door_open?: boolean
+          id?: string
+          recorded_at?: string
+          temperature?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telemetry_chamber_id_fkey"
+            columns: ["chamber_id"]
+            isOneToOne: false
+            referencedRelation: "chambers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          city: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_tenant_id: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "client"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +335,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "client"],
+    },
   },
 } as const
