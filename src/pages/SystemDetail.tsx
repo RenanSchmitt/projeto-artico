@@ -156,6 +156,8 @@ export default function SystemDetail() {
           </div>
         </Card>
 
+        <EngineeringPanel latest={latest} unit={pUnit} setUnit={setPUnit} />
+
         <Card className="p-5">
           <div className="flex items-center gap-2 mb-4">
             <AlertCircle className="text-status-warn" />
