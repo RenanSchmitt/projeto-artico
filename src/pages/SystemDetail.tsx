@@ -6,12 +6,18 @@ import HeartbeatBanner from "@/components/HeartbeatBanner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Thermometer, Snowflake, DoorOpen, DoorClosed, Power, AlertCircle } from "lucide-react";
+import { ArrowLeft, Thermometer, Snowflake, DoorOpen, DoorClosed, Power, AlertCircle, Gauge, Activity, Settings2 } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 type Chamber = { id: string; name: string; location: string | null; setpoint: number; min_temp: number; max_temp: number; tenant_id: string };
-type Reading = { temperature: number; compressor_on: boolean; defrost_on: boolean; door_open: boolean; recorded_at: string };
+type Reading = {
+  temperature: number; compressor_on: boolean; defrost_on: boolean; door_open: boolean; recorded_at: string;
+  suction_pressure: number | null; evaporation_pressure: number | null;
+  superheat: number | null; subcooling: number | null; condensation_temp: number | null;
+  eev_opening: number | null; eev_steps: number | null;
+};
 type Alarm = { id: string; severity: string; message: string; created_at: string };
+type PressureUnit = "BAR" | "PSI";
 
 export default function SystemDetail() {
   const { id } = useParams();
@@ -22,6 +28,7 @@ export default function SystemDetail() {
   const [history, setHistory] = useState<Reading[]>([]);
   const [latest, setLatest] = useState<Reading | null>(null);
   const [alarms, setAlarms] = useState<Alarm[]>([]);
+  const [pUnit, setPUnit] = useState<PressureUnit>("BAR");
 
   useEffect(() => {
     if (!id || !user) return;
@@ -34,7 +41,7 @@ export default function SystemDetail() {
         supabase.from("chambers").select("*").eq("id", id).maybeSingle(),
         supabase
           .from("telemetry")
-          .select("temperature, compressor_on, defrost_on, door_open, recorded_at")
+          .select("temperature, compressor_on, defrost_on, door_open, recorded_at, suction_pressure, evaporation_pressure, superheat, subcooling, condensation_temp, eev_opening, eev_steps")
           .eq("chamber_id", id)
           .gte("recorded_at", since)
           .order("recorded_at", { ascending: true }),
@@ -149,6 +156,8 @@ export default function SystemDetail() {
           </div>
         </Card>
 
+        <EngineeringPanel latest={latest} unit={pUnit} setUnit={setPUnit} />
+
         <Card className="p-5">
           <div className="flex items-center gap-2 mb-4">
             <AlertCircle className="text-status-warn" />
@@ -198,5 +207,159 @@ function Tile({ label, value, icon, active, alert }: { label: string; value: str
       </div>
       <div className={`text-2xl font-bold tabular-nums ${color}`}>{value}</div>
     </Card>
+  );
+}
+
+const BAR_TO_PSI = 14.5038;
+const fmtP = (barVal: number | null, unit: PressureUnit) => {
+  if (barVal === null || barVal === undefined) return "—";
+  const v = unit === "BAR" ? barVal : barVal * BAR_TO_PSI;
+  return v.toFixed(unit === "BAR" ? 2 : 1);
+};
+
+function EngineeringPanel({
+  latest, unit, setUnit,
+}: { latest: Reading | null; unit: PressureUnit; setUnit: (u: PressureUnit) => void }) {
+  const sh = latest?.superheat ?? null;
+  const sc = latest?.subcooling ?? null;
+  const shStatus = sh === null ? "off" : sh >= 5 && sh <= 10 ? "ok" : "alert";
+  const scStatus = sc === null ? "off" : sc >= 3 && sc <= 7 ? "ok" : "alert";
+  const eevPct = latest?.eev_opening ?? 0;
+  const eevSteps = latest?.eev_steps ?? 0;
+
+  const statusColor = (s: string) =>
+    s === "ok" ? "text-status-ok" : s === "alert" ? "text-status-alert" : "text-status-offline";
+  const statusBg = (s: string) =>
+    s === "ok" ? "bg-status-ok" : s === "alert" ? "bg-status-alert" : "bg-status-offline";
+
+  return (
+    <Card className="p-5 font-mono">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Settings2 className="text-status-ok" />
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">PLC · Refrigeration Telemetry</div>
+            <h2 className="text-lg font-bold tracking-wide">Painel de Engenharia</h2>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-[10px] border border-border rounded-md p-0.5">
+          {(["BAR", "PSI"] as PressureUnit[]).map((u) => (
+            <button
+              key={u}
+              onClick={() => setUnit(u)}
+              className={`px-2.5 py-1 rounded-sm uppercase tracking-widest transition ${
+                unit === u ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {u}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Pressures */}
+      <div className="grid gap-3 sm:grid-cols-2 mb-4">
+        <PlcGauge
+          label="Pressão de Sucção"
+          value={fmtP(latest?.suction_pressure ?? null, unit)}
+          unit={unit}
+          icon={<Gauge className="w-3.5 h-3.5" />}
+          tone="ok"
+        />
+        <PlcGauge
+          label="Pressão de Evaporação"
+          value={fmtP(latest?.evaporation_pressure ?? null, unit)}
+          unit={unit}
+          icon={<Gauge className="w-3.5 h-3.5" />}
+          tone="ok"
+        />
+      </div>
+
+      {/* Thermo perf */}
+      <div className="grid gap-3 sm:grid-cols-3 mb-4">
+        <PlcMetric
+          label="Super-aquecimento (SH)"
+          value={sh !== null ? `${sh.toFixed(1)} K` : "—"}
+          range="ideal 5–10 K"
+          status={shStatus}
+        />
+        <PlcMetric
+          label="Sub-resfriamento (SC)"
+          value={sc !== null ? `${sc.toFixed(1)} K` : "—"}
+          range="ideal 3–7 K"
+          status={scStatus}
+        />
+        <PlcMetric
+          label="Temp. de Condensação"
+          value={latest?.condensation_temp != null ? `${Number(latest.condensation_temp).toFixed(1)} °C` : "—"}
+          range="referência ~35 °C"
+          status="off"
+        />
+      </div>
+
+      {/* EEV */}
+      <div className="border border-border rounded-md p-4 bg-secondary/40">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+            <Activity className="w-3.5 h-3.5 text-status-ok" />
+            Válvula de Expansão Eletrônica · EEV
+          </div>
+          <div className="text-[10px] text-muted-foreground tabular-nums">
+            <span className="text-status-ok font-bold">{eevSteps}</span> / 480 steps
+          </div>
+        </div>
+        <div className="flex items-end justify-between gap-4 mb-2">
+          <div className="text-3xl font-bold tabular-nums text-status-ok">
+            {eevPct.toFixed(1)}<span className="text-sm text-muted-foreground"> %</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Abertura</div>
+        </div>
+        <div className="h-3 w-full bg-background rounded-sm overflow-hidden border border-border">
+          <div
+            className="h-full bg-status-ok transition-all"
+            style={{ width: `${Math.min(100, Math.max(0, eevPct))}%`, boxShadow: "0 0 12px hsl(var(--status-ok) / 0.7)" }}
+          />
+        </div>
+        <div className="flex justify-between text-[9px] text-muted-foreground mt-1 tabular-nums">
+          <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function PlcGauge({
+  label, value, unit, icon, tone,
+}: { label: string; value: string; unit: string; icon: React.ReactNode; tone: "ok" | "alert" | "off" }) {
+  const color = tone === "ok" ? "text-status-ok" : tone === "alert" ? "text-status-alert" : "text-muted-foreground";
+  return (
+    <div className="border border-border rounded-md p-4 bg-secondary/40">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span className={color}>{icon}</span>{label}
+        </div>
+        <span className="text-[9px] text-muted-foreground tracking-widest">{unit}</span>
+      </div>
+      <div className={`text-4xl font-bold tabular-nums ${color}`} style={{ textShadow: "0 0 16px hsl(var(--status-ok) / 0.4)" }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function PlcMetric({
+  label, value, range, status,
+}: { label: string; value: string; range: string; status: "ok" | "alert" | "off" }) {
+  const color = status === "ok" ? "text-status-ok" : status === "alert" ? "text-status-alert" : "text-foreground";
+  const dot = status === "ok" ? "bg-status-ok pulse-ok" : status === "alert" ? "bg-status-alert pulse-alert" : "bg-status-offline";
+  return (
+    <div className="border border-border rounded-md p-4 bg-secondary/40">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>
+        <span className={`w-2 h-2 rounded-full ${dot}`} />
+      </div>
+      <div className={`text-2xl font-bold tabular-nums ${color}`}>{value}</div>
+      <div className="text-[10px] text-muted-foreground mt-1">{range}</div>
+    </div>
   );
 }

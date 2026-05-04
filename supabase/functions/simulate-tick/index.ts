@@ -44,12 +44,32 @@ Deno.serve(async (req) => {
     const door_open = Math.random() < 0.04;
     const defrost_on = Math.random() < 0.02;
 
+    // Refrigeration thermodynamics (R404A-ish) — simulated values
+    // Evaporation pressure depends on evaporation temp (~ temp - 5K approach)
+    const evapTemp = temp - 5;
+    const evaporation_pressure = Number((1.5 + (evapTemp + 30) * 0.06 + (Math.random() - 0.5) * 0.05).toFixed(2)); // bar
+    const suction_pressure = Number((evaporation_pressure - 0.15 - Math.random() * 0.1).toFixed(2)); // bar (line losses)
+    const condensation_temp = Number((35 + (Math.random() - 0.5) * 4 + (compressor_on ? 2 : -1)).toFixed(1));
+    // Superheat ideally 5–10K, subcooling ideally 3–7K
+    const superheat = Number((7 + (Math.random() - 0.5) * 5 + (door_open ? 2 : 0)).toFixed(1));
+    const subcooling = Number((5 + (Math.random() - 0.5) * 3).toFixed(1));
+    // EEV opening reacts to superheat — high SH => open more
+    const eev_opening = Number(Math.max(5, Math.min(100, 40 + (superheat - 7) * 6 + (Math.random() - 0.5) * 4)).toFixed(1));
+    const eev_steps = Math.round((eev_opening / 100) * 480);
+
     newRows.push({
       chamber_id: ch.id,
       temperature: Number(temp.toFixed(2)),
       compressor_on,
       defrost_on,
       door_open,
+      suction_pressure,
+      evaporation_pressure,
+      superheat,
+      subcooling,
+      condensation_temp,
+      eev_opening,
+      eev_steps,
     });
 
     if (temp > Number(ch.max_temp)) {
