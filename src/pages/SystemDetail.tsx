@@ -6,12 +6,18 @@ import HeartbeatBanner from "@/components/HeartbeatBanner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Thermometer, Snowflake, DoorOpen, DoorClosed, Power, AlertCircle } from "lucide-react";
+import { ArrowLeft, Thermometer, Snowflake, DoorOpen, DoorClosed, Power, AlertCircle, Gauge, Activity, Settings2 } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 type Chamber = { id: string; name: string; location: string | null; setpoint: number; min_temp: number; max_temp: number; tenant_id: string };
-type Reading = { temperature: number; compressor_on: boolean; defrost_on: boolean; door_open: boolean; recorded_at: string };
+type Reading = {
+  temperature: number; compressor_on: boolean; defrost_on: boolean; door_open: boolean; recorded_at: string;
+  suction_pressure: number | null; evaporation_pressure: number | null;
+  superheat: number | null; subcooling: number | null; condensation_temp: number | null;
+  eev_opening: number | null; eev_steps: number | null;
+};
 type Alarm = { id: string; severity: string; message: string; created_at: string };
+type PressureUnit = "BAR" | "PSI";
 
 export default function SystemDetail() {
   const { id } = useParams();
