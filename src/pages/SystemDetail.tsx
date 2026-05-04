@@ -28,6 +28,7 @@ export default function SystemDetail() {
   const [history, setHistory] = useState<Reading[]>([]);
   const [latest, setLatest] = useState<Reading | null>(null);
   const [alarms, setAlarms] = useState<Alarm[]>([]);
+  const [pUnit, setPUnit] = useState<PressureUnit>("BAR");
 
   useEffect(() => {
     if (!id || !user) return;
@@ -40,7 +41,7 @@ export default function SystemDetail() {
         supabase.from("chambers").select("*").eq("id", id).maybeSingle(),
         supabase
           .from("telemetry")
-          .select("temperature, compressor_on, defrost_on, door_open, recorded_at")
+          .select("temperature, compressor_on, defrost_on, door_open, recorded_at, suction_pressure, evaporation_pressure, superheat, subcooling, condensation_temp, eev_opening, eev_steps")
           .eq("chamber_id", id)
           .gte("recorded_at", since)
           .order("recorded_at", { ascending: true }),
