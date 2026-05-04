@@ -120,28 +120,49 @@ export type Database = {
         Row: {
           chamber_id: string
           compressor_on: boolean
+          condensation_temp: number | null
           defrost_on: boolean
           door_open: boolean
+          eev_opening: number | null
+          eev_steps: number | null
+          evaporation_pressure: number | null
           id: string
           recorded_at: string
+          subcooling: number | null
+          suction_pressure: number | null
+          superheat: number | null
           temperature: number
         }
         Insert: {
           chamber_id: string
           compressor_on?: boolean
+          condensation_temp?: number | null
           defrost_on?: boolean
           door_open?: boolean
+          eev_opening?: number | null
+          eev_steps?: number | null
+          evaporation_pressure?: number | null
           id?: string
           recorded_at?: string
+          subcooling?: number | null
+          suction_pressure?: number | null
+          superheat?: number | null
           temperature: number
         }
         Update: {
           chamber_id?: string
           compressor_on?: boolean
+          condensation_temp?: number | null
           defrost_on?: boolean
           door_open?: boolean
+          eev_opening?: number | null
+          eev_steps?: number | null
+          evaporation_pressure?: number | null
           id?: string
           recorded_at?: string
+          subcooling?: number | null
+          suction_pressure?: number | null
+          superheat?: number | null
           temperature?: number
         }
         Relationships: [
