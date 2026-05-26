@@ -15,18 +15,20 @@
     OneSignal.push(function () {
       OneSignal.init({
         appId: "f72d6a18-1a19-48c9-b886-e023d2c49bcb",
+        // Configuração crucial para rodar em subpasta no iOS:
+        serviceWorkerParam: { scope: "/projeto-artico/" },
+        serviceWorkerPath: "projeto-artico/OneSignalSDKWorker.js",
         notifyButton: {
-          enable: true, /* Força o sininho vermelho a aparecer no canto */
+          enable: true, /* Ativa o sininho para ajudar a forçar o clique se o clique na tela falhar */
         },
       });
 
-      // Se o usuário clicar em qualquer lugar da tela, tenta chamar o prompt nativo
+      // Evento de clique para disparar o pedido de permissão nativo no iPhone
       document.addEventListener('click', function () {
         OneSignal.Notifications.requestPermission();
       }, { once: true });
     });
   </script>
-
   <meta property="og:type" content="website" />
   <meta property="og:image"
     content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3d2d2f2b-0f88-46b4-a8ab-130f0e3a6b9d/id-preview-207e2a61--1439aa08-5e26-45c3-a61e-8ad0a9e284ef.lovable.app-1777756514543.png">
