@@ -14,6 +14,8 @@ const Bancada = () => {
 
   const enviarDados = async (tempVal = temperature, pressVal = pressure, eevVal = eevSteps, compVal = compressor) => {
     setEnviando(true);
+    
+    // 1. Envia a telemetria para a tabela do Supabase
     const { error } = await supabase.from("telemetry").insert([
       {
         chamber_id: CHAMBER_ID,
@@ -30,6 +32,28 @@ const Bancada = () => {
       toast.error("Erro ao injetar telemetria: " + error.message);
     } else {
       toast.success(`Telemetria Real enviada! (${tempVal}°C / ${pressVal} bar)`);
+
+      // 2. DISPARO DO PUSH SE A TEMPERATURA SUBIR (Ex: maior que 5.0°C)
+      if (tempVal > 5.0) {
+        const messageText = `⚠️ ALERTA CRÍTICO: Câmara de Salmão Real atingiu ${tempVal.toFixed(1)}°C!`;
+        
+        fetch("https://onesignal.com/api/v1/notifications", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Authorization": "Basic kffxmmodgexrvtl2kmsidljmk" // Sua Rest API Key do OneSignal
+          },
+          body: JSON.stringify({
+            app_id: "f72d6a18-1a19-48c9-b886-e023d2c49bcb", // Seu App ID do OneSignal
+            included_segments: ["All Users"],
+            contents: { en: messageText, pt: messageText },
+            headings: { en: "FRIOCTRL - Alerta Técnico", pt: "FRIOCTRL - Alerta Técnico" }
+          })
+        })
+        .then((res) => res.json())
+        .then((data) => console.log("Push OneSignal enviado com sucesso:", data))
+        .catch((err) => console.error("Erro ao disparar push do front:", err));
+      }
     }
   };
 
