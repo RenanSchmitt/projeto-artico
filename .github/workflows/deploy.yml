@@ -1,16 +1,23 @@
-name: Deploy to GitHub Pages
+name: Deploy Vite Site to Pages
 
 on:
   push:
-    branches: ["main"] # Se sua branch for 'master', troque aqui
+    branches: ["main"] # Altere para "master" se a sua branch principal tiver esse nome
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
-  build:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,7 +30,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci # ou npm install se não tiver o package-lock.json redondo
 
       - name: Build
         run: npm run build
@@ -31,6 +38,7 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: "vpmukocqdtljdxqndwts"
           VITE_SUPABASE_URL: "https://vpmukocqdtljdxqndwts.supabase.co"
           VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable__ou8zAv4B5X1J08x4BaMVA_tSaJ7Zz9"
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
@@ -39,13 +47,6 @@ jobs:
         with:
           path: './dist'
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
