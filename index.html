@@ -9,19 +9,29 @@
   <meta name="description" content="Monitoramento industrial em tempo real de câmaras frias com integração Boss Carel.">
   <meta name="author" content="FrioCtrl" />
 
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <script>
-    window.OneSignal = window.OneSignal || [];
-    OneSignal.push(function () {
-      OneSignal.init({
-        appId: "f72d6a18-1a19-48c9-b886-e023d2c49bcb",
-        safari_web_id: "web.onesignal.auto.10df7a28-f1f3-4686-9706-e0477bebc578", // O OneSignal gera isso automaticamente, pode manter a inicialização padrão
-        notifyButton: {
-          enable: true, // Isso vai fazer aparecer um sininho discreto no canto inferior do site
-        },
-        allowLocalhostAsSecureOrigin: true // Permite que você teste até rodando local se precisar
-      });
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignal = window.OneSignal || [];
+  OneSignal.push(function () {
+    OneSignal.init({
+      appId: "f72d6a18-1a19-48c9-b886-e023d2c49bcb",
+      allowLocalhostAsSecureOrigin: true
     });
+
+    // Função para disparar o prompt no iOS
+    function triggerPushPrompt() {
+      OneSignal.Notifications.requestPermission().then(function(permission) {
+        console.log("Permissão do iOS:", permission);
+      });
+    }
+
+    // No iOS, precisamos que o usuário toque na tela para o prompt poder abrir
+    document.addEventListener('click', function() {
+      // Só dispara se o usuário ainda não decidiu (default)
+      if (Notification.permission === 'default') {
+        triggerPushPrompt();
+      }
+    }, { once: true }); // Executa apenas no primeiro clique
   </script>
 
   <meta property="og:type" content="website" />
