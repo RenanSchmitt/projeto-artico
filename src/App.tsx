@@ -9,11 +9,15 @@ import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
 
+// Detecta automaticamente se o app está rodando no GitHub Pages ou localmente
+const basename = import.meta.env.MODE === "production" ? "/projeto-artico" : "";
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Sonner theme="dark" />
-      <BrowserRouter>
+      {/* O basename avisa ao React Router qual é a pasta inicial do projeto */}
+      <BrowserRouter basename={basename}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/auth" element={<Auth />} />
