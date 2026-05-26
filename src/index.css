@@ -43,7 +43,7 @@
     --status-offline: 0 0% 40%;       /* Cinza */
 
     /* Glow shadows */
-    --glow-ok: 0 0 20px hsl(142 100% 50% / 0.5);
+    --glow-ok: 0 0 20px hsla(293, 91%, 13%, 0.5);
     --glow-alert: 0 0 24px hsl(0 100% 55% / 0.6);
 
     /* Sidebar (unused but keep tokens) */
