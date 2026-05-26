@@ -5,7 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: "/projeto-artico/", // 👈 Adicionado para corrigir as rotas e a tela branca no GitHub Pages
+  // Se estiver local (development), usa a raiz '/'. Se for build do GitHub Pages, usa '/projeto-artico/'
+  base: mode === "production" ? "/projeto-artico/" : "/", 
   server: {
     host: "::",
     port: 8080,
