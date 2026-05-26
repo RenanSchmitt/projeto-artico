@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  base: "/projeto-artico/", // 👈 Adicionado para corrigir as rotas e a tela branca no GitHub Pages
   server: {
     host: "::",
     port: 8080,
