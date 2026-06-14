@@ -10,6 +10,9 @@ import Auth from "./pages/Auth";
 import Bancada from "./pages/Bancada";
 import NotFound from "./pages/NotFound.tsx";
 
+// 👇 1. IMPORTA A NOVA TELA DE USUÁRIOS
+import AdminUsers from "./pages/AdminUsers";
+
 const queryClient = new QueryClient();
 
 const App = () => {
@@ -58,6 +61,10 @@ const App = () => {
             <Route path="/system/:id" element={<SystemDetail />} />
             <Route path="/bancada" element={<Bancada />} />
             <Route path="/admin" element={<AdminChambers />} />
+            
+            {/* 👇 2. NOVA ROTA ADICIONADA SEGUINDO O SEU PADRÃO */}
+            <Route path="/admin/users" element={<AdminUsers />} />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </HashRouter>

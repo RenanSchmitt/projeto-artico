@@ -1,171 +1,347 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/components/ui/use-toast";
+import { Trash2, Shield, Building, Cpu, ArrowLeft, Copy, Check } from "lucide-react";
 
-interface Chamber {
-  id: string;
-  name: string;
-  connection_type: 'virtual' | 'real';
-  device_address: string | null;
-  created_at: string;
-}
+type Tenant = { id: string; name: string };
+type Chamber = { 
+  id: string; 
+  name: string; 
+  location: string | null; 
+  tenant_id: string; 
+  setpoint: number; 
+  min_temp: number; 
+  max_temp: number; 
+};
 
-const AdminChambers = () => {
+export default function AdminChamberManager() {
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [chambers, setChambers] = useState<Chamber[]>([]);
-  const [name, setName] = useState("");
-  const [connectionType, setConnectionType] = useState<'virtual' | 'real'>("virtual");
-  const [deviceAddress, setDeviceAddress] = useState("");
   const [loading, setLoading] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  
+  // Controle de Modo Virtual (Simulado) ou Real (Hardware)
+  const [isVirtualMode, setIsVirtualMode] = useState<boolean>(true);
 
-  const fetchChambers = async () => {
-    const { data, error } = await supabase
-      .from("chambers")
-      .select("id, name, connection_type, device_address, created_at")
-      .order("created_at", { ascending: false });
-    
-    if (!error && data) setChambers(data as Chamber[]);
-  };
+  // Estados do formulário de cadastro
+  const [name, setName] = useState("");
+  const [location, setLocation] = useState("");
+  const [selectedTenantId, setSelectedTenantId] = useState("");
+  const [setpoint, setSetpoint] = useState("-18.0");
+  const [minTemp, setMinTemp] = useState("-22.0");
+  const [maxTemp, setMaxTemp] = useState("-15.0");
 
   useEffect(() => {
-    fetchChambers();
+    fetchData();
+    fetchSystemMode();
   }, []);
 
-  const handleCreateChamber = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return toast.error("Insira o nome da câmara");
+  async function fetchData() {
+    try {
+      const [{ data: tsData }, { data: chsData }] = await Promise.all([
+        supabase.from("tenants").select("id, name").order("name"),
+        supabase.from("chambers").select("*").order("name")
+      ]);
+      
+      if (tsData) setTenants(tsData);
+      if (chsData) setChambers(chsData);
+    } catch (err) {
+      console.error("Erro ao carregar dados do admin:", err);
+    }
+  }
 
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("chambers")
-      .insert([
-        {
-          name: name,
-          connection_type: connectionType,
-          device_address: connectionType === 'real' ? deviceAddress : 'SIMULADOR_INTERNO',
-        },
-      ])
-      .select();
+  async function fetchSystemMode() {
+    try {
+      const { data } = await supabase.from("system_settings").select("value").eq("key", "simulation_mode").maybeSingle();
+      if (data) {
+        setIsVirtualMode(data.value === "true");
+      }
+    } catch (err) {
+      console.log("Usando estado local para simulação.");
+    }
+  }
 
-    setLoading(false);
-
-    if (error) {
-      toast.error("Erro ao criar câmara: " + error.message);
-    } else {
-      toast.success("Câmara cadastrada com sucesso!");
-      setName("");
-      setDeviceAddress("");
-      fetchChambers();
+  const handleToggleMode = async (checked: boolean) => {
+    setIsVirtualMode(checked);
+    try {
+      await supabase.from("system_settings").upsert({ key: "simulation_mode", value: String(checked) });
+      toast({
+        title: checked ? "Modo Virtual Ativo" : "Modo Real Ativo",
+        description: checked 
+          ? "O sistema agora está a gerar dados simulados automaticamente." 
+          : "O sistema agora está a aguardar leituras reais do hardware (ESP32).",
+      });
+    } catch (err) {
+      toast({
+        title: checked ? "Modo Virtual (Local)" : "Modo Real (Local)",
+        description: "Modo alterado na interface.",
+      });
     }
   };
 
+  const handleCreateChamber = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !selectedTenantId) {
+      toast({
+        title: "Erro de validação",
+        description: "Por favor, insira o nome da câmara e selecione um cliente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.from("chambers").insert([
+        {
+          name: name,
+          location: location || null,
+          tenant_id: selectedTenantId,
+          setpoint: Number(setpoint),
+          min_temp: Number(minTemp),
+          max_temp: Number(maxTemp),
+        },
+      ]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso!",
+        description: `A câmara "${name}" foi vinculada ao cliente com sucesso.`,
+      });
+
+      setName("");
+      setLocation("");
+      setSelectedTenantId("");
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Erro ao criar câmara",
+        description: err.message || "Erro no banco de dados.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteChamber = async (id: string, chamberName: string) => {
+    if (!confirm(`Tem certeza que deseja apagar permanentemente a câmara "${chamberName}"?`)) {
+      return;
+    }
+    try {
+      const { error } = await supabase.from("chambers").delete().eq("id", id);
+      if (error) throw error;
+      toast({
+        title: "Câmara removida",
+        description: `A câmara "${chamberName}" foi excluída com sucesso.`,
+      });
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Erro ao excluir",
+        description: err.message || "Não foi possível remover a câmara.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função auxiliar para copiar o ID do Hardware
+  const copyToClipboard = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    toast({
+      title: "Copiado!",
+      description: "ID da câmara copiado para configurar no ESP32.",
+    });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-white p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Painel Administrativo FrioCtrl</h1>
-          <p className="text-sm text-zinc-400">Gerenciamento de Infraestrutura e Dispositivos Boss Carel</p>
-        </div>
+    <div className="max-w-5xl mx-auto p-4 space-y-6">
+      
+      {/* BOTÃO VOLTAR */}
+      <div className="flex items-center justify-start">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => navigate("/")}
+          className="gap-2 font-semibold"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Voltar ao Painel
+        </Button>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* FORMULÁRIO */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 h-fit space-y-4">
-            <h2 className="text-lg font-semibold text-emerald-400">Nova Câmara / Ativo</h2>
-            
-            <form onSubmit={handleCreateChamber} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs text-zinc-400 font-medium">Nome da Câmara</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Câmara de Salmão 02"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs text-zinc-400 font-medium">Tipo de Conexão</label>
-                <select
-                  value={connectionType}
-                  onChange={(e) => setConnectionType(e.target.value as 'virtual' | 'real')}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="virtual">Bancada Virtual (Simulada)</option>
-                  <option value="real">Câmara Real (Boss Carel Webhook)</option>
-                </select>
-              </div>
-
-              {connectionType === 'real' && (
-                <div className="space-y-1">
-                  <label className="text-xs text-zinc-400 font-medium">Endereço/ID do Dispositivo no Boss</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: mpxpro_idx_01"
-                    value={deviceAddress}
-                    onChange={(e) => setDeviceAddress(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 font-semibold text-sm rounded-lg transition-colors text-black"
-              >
-                {loading ? "Cadastrando..." : "Adicionar Câmara"}
-              </button>
-            </form>
-          </div>
-
-          {/* LISTAGEM E INTEGRAÇÃO */}
-          <div className="md:col-span-2 space-y-4">
-            <h2 className="text-lg font-semibold text-zinc-300">Câmaras Registradas</h2>
-            
-            <div className="space-y-3">
-              {chambers.map((c) => (
-                <div key={c.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-bold text-zinc-200">{c.name}</h3>
-                      <p className="text-xs text-zinc-500 font-mono mt-0.5">ID do Banco: {c.id}</p>
-                    </div>
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                      c.connection_type === 'real' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                    }`}>
-                      {c.connection_type === 'real' ? 'Física (Real)' : 'Virtual / Bancada'}
-                    </span>
-                  </div>
-
-                  {c.connection_type === 'real' && (
-                    <div className="bg-zinc-950 p-3.5 rounded-lg border border-zinc-800 text-xs space-y-2 font-mono">
-                      <p className="text-zinc-400 font-sans font-semibold text-xs border-b border-zinc-800 pb-1 text-blue-400">
-                        ⚙️ CONFIGURAÇÃO DO WEBHOOK NO BOSS CAREL:
-                      </p>
-                      <p><span className="text-zinc-500">MÉTODO:</span> <span className="text-emerald-400 font-bold">POST</span></p>
-                      <p><span className="text-zinc-500">URL:</span> <span className="text-zinc-300 select-all">https://vpmukocqdtljdxqndwts.supabase.co/rest/v1/telemetry</span></p>
-                      <p><span className="text-zinc-500">HEADERS:</span></p>
-                      <p className="pl-4 text-zinc-400">apikey: sb_publishable__ou8zAv4B5X1J08x4BaMVA_tSaJ7Zz9</p>
-                      <p className="pl-4 text-zinc-400">Authorization: Bearer sb_publishable__ou8zAv4B5X1J08x4BaMVA_tSaJ7Zz9</p>
-                      <p><span className="text-zinc-500">PAYLOAD JSON (Exemplo de Envio):</span></p>
-                      <pre className="bg-zinc-900 p-2 rounded border border-zinc-800 text-zinc-400">
-{`{
-  "chamber_id": "${c.id}",
-  "temperature": 2.5,
-  "suction_pressure": 2.1,
-  "compressor_on": true
-}`}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              ))}
+      {/* CONTROLE GLOBAL: VIRTUAL VS REAL */}
+      <Card className="border-border bg-card overflow-hidden relative">
+        <div className={`absolute top-0 left-0 w-1.5 h-full ${isVirtualMode ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+        <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-lg ${isVirtualMode ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+              <Cpu className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="font-bold text-lg tracking-wide uppercase">Ambiente de Operação</h2>
+              <p className="text-xs text-muted-foreground">
+                Defina se o painel opera com telemetrias simuladas em nuvem ou via hardware físico.
+              </p>
             </div>
           </div>
-        </div>
-      </div>
+          <div className="flex items-center gap-3 bg-muted/50 px-4 py-2.5 rounded-xl border border-border">
+            <span className={`text-xs font-bold uppercase tracking-wider ${!isVirtualMode ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+              Hardware Real
+            </span>
+            <Switch 
+              checked={isVirtualMode} 
+              onCheckedChange={handleToggleMode}
+              className="data-[state=checked]:bg-amber-500"
+            />
+            <span className={`text-xs font-bold uppercase tracking-wider ${isVirtualMode ? 'text-amber-500' : 'text-muted-foreground'}`}>
+              Simulador Virtual
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* FORMULÁRIO DE CADASTRO */}
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="text-xl font-bold tracking-wide flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" /> CADASTRAR NOVA CÂMARA
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCreateChamber} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Cliente / Empresa Destino</label>
+              <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione o cliente responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tenants.map((tenant) => (
+                    <SelectItem key={tenant.id} value={tenant.id}>
+                      {tenant.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Nome da Câmara</label>
+                <Input placeholder="Ex: Câmara de Congelados" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Localização / Setor</label>
+                <Input placeholder="Ex: Pavilhão A (Opcional)" value={location} onChange={(e) => setLocation(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Setpoint (°C)</label>
+                <Input type="number" step="0.1" value={setpoint} onChange={(e) => setSetpoint(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Temp. Mínima (°C)</label>
+                <Input type="number" step="0.1" value={minTemp} onChange={(e) => setMinTemp(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Temp. Máxima (°C)</label>
+                <Input type="number" step="0.1" value={maxTemp} onChange={(e) => setMaxTemp(e.target.value)} />
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full mt-2" disabled={loading}>
+              {loading ? "Processando..." : "Salvar e Vincular Câmara"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* TABELA DE GERENCIAMENTO */}
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="text-xl font-bold tracking-wide flex items-center gap-2">
+            <Building className="w-5 h-5 text-primary" /> GERENCIAR CÂMARAS ATIVAS ({chambers.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs uppercase bg-muted text-muted-foreground font-bold border-b border-border">
+                <tr>
+                  <th className="p-4">Cliente Vinculado</th>
+                  <th className="p-4">Nome da Câmara</th>
+                  <th className="p-4">ID p/ o ESP32 (Hardware)</th>
+                  <th className="p-4 text-center">Configurações</th>
+                  <th className="p-4 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {chambers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhuma câmara cadastrada.</td>
+                  </tr>
+                ) : (
+                  chambers.map((ch) => {
+                    const client = tenants.find((t) => t.id === ch.tenant_id);
+                    return (
+                      <tr key={ch.id} className="hover:bg-muted/40 transition-colors">
+                        <td className="p-4 font-semibold text-primary">{client ? client.name : "⚠️ Sem Empresa"}</td>
+                        <td className="p-4 font-bold">
+                          {ch.name}
+                          {ch.location && <span className="block text-xs font-normal text-muted-foreground">{ch.location}</span>}
+                        </td>
+                        {/* 🛠️ NOVA COLUNA PARA COPIAR O ID EXATO DO HARDWARE */}
+                        <td className="p-4">
+                          <div className="flex items-center gap-2 bg-muted/60 px-2 py-1 rounded border border-border max-w-[220px]">
+                            <span className="text-xs font-mono truncate text-muted-foreground">{ch.id}</span>
+                            <Button 
+                              type="button"
+                              variant="ghost" 
+                              size="icon" 
+                              className="w-6 h-6 shrink-0" 
+                              onClick={() => copyToClipboard(ch.id)}
+                            >
+                              {copiedId === ch.id ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                            </Button>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
+                            <span>Set: <strong className="text-foreground">{ch.setpoint}°C</strong></span>
+                            <span>Min: <strong className="text-foreground">{ch.min_temp}°C</strong></span>
+                            <span>Max: <strong className="text-foreground">{ch.max_temp}°C</strong></span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <Button variant="destructive" size="icon" className="w-8 h-8 rounded-md" onClick={() => handleDeleteChamber(ch.id, ch.name)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
-};
-
-export default AdminChambers;
+}

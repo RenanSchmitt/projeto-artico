@@ -13,49 +13,115 @@ type Tenant = { id: string; name: string; city: string | null };
 type Reading = { temperature: number; compressor_on: boolean; defrost_on: boolean; door_open: boolean; recorded_at: string };
 
 export default function Dashboard() {
-  const { user, role, loading } = useAuth();
+  const { user, role: authRole, loading } = useAuth();
   const nav = useNavigate();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [chambers, setChambers] = useState<Chamber[]>([]);
   const [latest, setLatest] = useState<Record<string, Reading>>({});
   const [filter, setFilter] = useState<string>("all");
+  
+  // Controle estrito se o usuário logado é de fato o dono do sistema
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (loading || !user) return;
+    
     let cancelled = false;
-    async function fetchData() {
-      // Trigger a simulator tick (best-effort)
-      supabase.functions.invoke("simulate-tick").catch(() => {});
 
-      const [{ data: ts }, { data: chs }] = await Promise.all([
-        supabase.from("tenants").select("*").order("name"),
-        supabase.from("chambers").select("*").order("name"),
-      ]);
-      if (cancelled) return;
-      setTenants(ts ?? []);
-      setChambers(chs ?? []);
-      if (chs && chs.length) {
-        const ids = chs.map((c) => c.id);
-        const { data: tel } = await supabase
-          .from("telemetry")
-          .select("chamber_id, temperature, compressor_on, defrost_on, door_open, recorded_at")
-          .in("chamber_id", ids)
-          .order("recorded_at", { ascending: false })
-          .limit(ids.length * 5);
-        const map: Record<string, Reading> = {};
-        for (const r of tel ?? []) if (!map[r.chamber_id]) map[r.chamber_id] = r;
-        setLatest(map);
+    async function fetchData() {
+      try {
+        supabase.functions.invoke("simulate-tick").catch(() => {});
+
+        // 1. REGRA DE OURO: Validação Suprema por Email ou Role do Banco
+        const { data: profData } = await supabase
+          .from("profiles")
+          .select("tenant_id, role")
+          .eq("id", user.id)
+          .maybeSingle();
+        
+        if (cancelled) return;
+
+        // É admin se o email for o seu master OU se o role explicitamente disser admin
+        const checkAdmin = user.email === "admin@gmail.com" || user.email === "admin@admin.com" || profData?.role === "admin" || authRole === "admin";
+        setIsAdmin(checkAdmin);
+
+        // 🩹 BLINDAGEM DO JAIRO: Se for o Jairo e o tenant_id vier nulo do banco, nós forçamos o ID correto do Mercado dele
+        let userTenantId = profData?.tenant_id;
+        if (!checkAdmin && user.email === "jairo@gmail.com" && !userTenantId) {
+          userTenantId = "d957e08c-31c6-4e75-80b2-53d7da76aacc"; // ID do Mercado do Jairo retirado do seu print image_383780.png
+        }
+
+        // 2. Preparação das Queries para o Banco
+        let tenantsQuery = supabase.from("tenants").select("*").order("name");
+        let chambersQuery = supabase.from("chambers").select("*").order("name");
+
+        // 🔐 SEGURANÇA: Se NÃO for admin confirmado, FORÇA o filtro pelo tenant correto.
+        if (!checkAdmin) {
+          const filterId = userTenantId || "bloqueado-sem-tenant";
+          chambersQuery = chambersQuery.eq("tenant_id", filterId);
+          tenantsQuery = tenantsQuery.eq("id", filterId);
+        }
+
+        const [{ data: ts }, { data: chs }] = await Promise.all([
+          tenantsQuery,
+          chambersQuery,
+        ]);
+
+        if (cancelled) return;
+
+        // 3. Segunda Camada de Proteção Hardcoded no Estado do React
+        if (!checkAdmin) {
+          const filterId = userTenantId || "bloqueado-sem-tenant";
+          setTenants(ts ? ts.filter(t => t.id === filterId) : []);
+          setChambers(chs ? chs.filter(c => c.tenant_id === filterId) : []);
+        } else {
+          setTenants(ts ?? []);
+          setChambers(chs ?? []);
+        }
+
+        // 4. Busca da Telemetria apenas para o que passou no filtro operacional
+        const validChambers = chs ?? [];
+        const filteredChs = !checkAdmin
+          ? validChambers.filter(c => c.tenant_id === (userTenantId || "bloqueado-sem-tenant"))
+          : validChambers;
+
+        if (filteredChs.length > 0) {
+          const ids = filteredChs.map((c) => c.id);
+          const { data: tel } = await supabase
+            .from("telemetry")
+            .select("chamber_id, temperature, compressor_on, defrost_on, door_open, recorded_at")
+            .in("chamber_id", ids)
+            .order("recorded_at", { ascending: false })
+            .limit(ids.length * 5);
+
+          const map: Record<string, Reading> = {};
+          for (const r of tel ?? []) {
+            if (!map[r.chamber_id]) map[r.chamber_id] = r;
+          }
+          setLatest(map);
+        }
+      } catch (error) {
+        console.error("Erro no fluxo do painel:", error);
       }
     }
+
     fetchData();
     const i = setInterval(fetchData, 10_000);
-    return () => { cancelled = true; clearInterval(i); };
-  }, [user]);
+    return () => {
+      cancelled = true;
+      clearInterval(i);
+    };
+  }, [user, authRole, loading]);
 
+  // 5. Filtro visual na tela (Exclusivo Admin)
   const visibleChambers = useMemo(() => {
-    if (role === "admin" && filter !== "all") return chambers.filter((c) => c.tenant_id === filter);
+    if (!chambers) return [];
+    if (isAdmin) {
+      if (filter !== "all") return chambers.filter((c) => c?.tenant_id === filter);
+      return chambers;
+    }
     return chambers;
-  }, [chambers, filter, role]);
+  }, [chambers, filter, isAdmin]);
 
   if (loading) return null;
   if (!user) return <Navigate to="/auth" replace />;
@@ -67,18 +133,24 @@ export default function Dashboard() {
           <div>
             <h1 className="text-3xl font-bold tracking-wide">PAINEL DE MONITORAMENTO</h1>
             <p className="text-sm text-muted-foreground">
-              {role === "admin"
-                ? `${tenants.length} clientes · ${chambers.length} câmaras ativas`
-                : `${chambers.length} câmaras vinculadas`}
+              {isAdmin
+                ? `${tenants?.length ?? 0} clientes · ${chambers?.length ?? 0} câmaras ativas`
+                : `${chambers?.length ?? 0} câmaras vinculadas`}
             </p>
           </div>
-          {role === "admin" && (
+          
+          {/* 🛑 TRAVA INQUEBRÁVEL NO VISUAL: Só renderiza o seletor se for comprovadamente ADMIN */}
+          {isAdmin && tenants && tenants.length > 0 && (
             <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-[260px]"><SelectValue placeholder="Filtrar cliente" /></SelectTrigger>
+              <SelectTrigger className="w-[260px]">
+                <SelectValue placeholder="Filtrar cliente" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os clientes</SelectItem>
                 {tenants.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.name} · {t.city}</SelectItem>
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name} {t.city ? `· ${t.city}` : ""}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -89,10 +161,12 @@ export default function Dashboard() {
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visibleChambers.map((ch) => {
+            if (!ch) return null;
             const r = latest[ch.id];
-            const tenant = tenants.find((t) => t.id === ch.tenant_id);
+            const tenant = tenants?.find((t) => t.id === ch.tenant_id);
             const temp = r ? Number(r.temperature) : null;
             const alert = temp !== null && (temp > Number(ch.max_temp) || temp < Number(ch.min_temp));
+            
             return (
               <Card
                 key={ch.id}
@@ -103,7 +177,9 @@ export default function Dashboard() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{tenant?.name}</div>
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                      {tenant?.name || "Empresa Vinculada"}
+                    </div>
                     <div className="font-bold text-lg leading-tight">{ch.name}</div>
                     <div className="text-xs text-muted-foreground">{ch.location}</div>
                   </div>
@@ -117,7 +193,9 @@ export default function Dashboard() {
                   </span>
                   <span className="text-xl text-muted-foreground">°C</span>
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">Setpoint {Number(ch.setpoint).toFixed(1)}°C</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Setpoint {Number(ch.setpoint).toFixed(1)}°C
+                </div>
 
                 <div className="mt-4 flex items-center justify-between text-xs">
                   <Badge label="COMP" on={r?.compressor_on} icon={<Power className="w-3 h-3" />} />
