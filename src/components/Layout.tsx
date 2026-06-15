@@ -2,8 +2,9 @@ import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Snowflake, LogOut, Thermometer, Users } from "lucide-react";
+import { Snowflake, LogOut, Thermometer, Users, Menu } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export default function Layout({ children }: { children: ReactNode }) {
   const nav = useNavigate();
@@ -14,7 +15,6 @@ export default function Layout({ children }: { children: ReactNode }) {
     nav("/auth", { replace: true });
   }
 
-  // 🔐 Condição para saber se o usuário logado é Administrador
   const isAdmin = role === "admin" || user?.email === "admin@admin.com";
 
   return (
@@ -22,19 +22,41 @@ export default function Layout({ children }: { children: ReactNode }) {
       <header className="border-b border-border bg-card/60 backdrop-blur-sm sticky top-0 z-40">
         <div className="container flex items-center justify-between h-16">
           
-          {/* LADO ESQUERDO: LOGO E BOTÕES DE ADM */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            {/* MENU HAMBÚRGUER (Aparece APENAS no mobile) */}
+            {isAdmin && (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <Menu className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[240px] bg-card">
+                  <nav className="flex flex-col gap-4 mt-8">
+                    <Button variant="ghost" className="justify-start gap-2" onClick={() => nav("/admin")}>
+                      <Thermometer className="w-4 h-4 text-primary" /> Gerenciar Câmaras
+                    </Button>
+                    <Button variant="ghost" className="justify-start gap-2" onClick={() => nav("/admin/users")}>
+                      <Users className="w-4 h-4 text-blue-500" /> Criar Usuários
+                    </Button>
+                  </nav>
+                </SheetContent>
+              </Sheet>
+            )}
+
+            {/* LOGO E NOME (Aparece em todos os tamanhos) */}
             <button onClick={() => nav("/")} className="flex items-center gap-3">
               <div className="w-9 h-9 rounded bg-primary/10 border border-primary/40 flex items-center justify-center">
                 <Snowflake className="text-primary w-5 h-5" />
               </div>
               <div className="text-left">
                 <div className="font-bold tracking-wide leading-none">FRIO<span className="text-primary">CTRL</span></div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Boss Carel · Live</div>
+                {/* O subtítulo só aparece em telas maiores (sm) */}
+                <div className="text-[10px] text-muted-foreground uppercase tracking-widest hidden sm:block">Boss Carel · Live</div>
               </div>
             </button>
 
-            {/* 🚀 LINKS EXCLUSIVOS DO ADMINISTRADOR */}
+            {/* LINKS DESKTOP (Aparecem APENAS em telas médias ou maiores) */}
             {isAdmin && (
               <nav className="hidden md:flex items-center gap-2 border-l border-border pl-6">
                 <Button 
@@ -60,7 +82,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             )}
           </div>
 
-          {/* LADO DIREITO: INFORMAÇÕES DE CONTA E LOGOUT */}
+          {/* LADO DIREITO (Logout) */}
           <div className="flex items-center gap-4">
             <div className="text-right text-xs hidden sm:block">
               <div className="text-foreground">{user?.email}</div>
