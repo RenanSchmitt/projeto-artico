@@ -35,7 +35,7 @@ export default function SystemDetail() {
     let cancelled = false;
 
     // Dispara a simulação uma vez ao carregar
-    supabase.functions.invoke("simulate-tick").catch(() => {});
+    supabase.functions.invoke("simulate-tick").catch(() => { });
 
     // ⚡ MOTOR 1: Atualiza o bloco de Temperatura rápido (a cada 10 segundos)
     async function fetchLatest() {
@@ -73,7 +73,7 @@ export default function SystemDetail() {
           .select("chamber_id, temperature, recorded_at")
           .eq("chamber_id", id)
           .order("recorded_at", { ascending: false })
-          .limit(1000); 
+          .limit(1000);
 
         if (!cancelled) {
           setHistory(hist ? (hist as unknown as Reading[]).reverse() : []);
@@ -96,12 +96,12 @@ export default function SystemDetail() {
     fetchLatest();
     fetchHistoryAndMeta();
 
-    // Loops com tempos diferentes para economizar processamento e fixar o gráfico
-    const intervaloCards = setInterval(fetchLatest, 10_000);       // Cards mudam a cada 10 segundos
-    const intervaloGrafico = setInterval(fetchHistoryAndMeta, 3_600_000); // Gráfico só mexe a cada 1 hora (3600000 ms)
+    // Loops ajustados para sincronizar com o novo tempo da ESP32 (1 minuto)
+    const intervaloCards = setInterval(fetchLatest, 10_000);       // Cards atualizam rápido a cada 10 segundos
+    const intervaloGrafico = setInterval(fetchHistoryAndMeta, 60_000); // Gráfico atualiza a cada 1 minuto
 
-    return () => { 
-      cancelled = true; 
+    return () => {
+      cancelled = true;
       clearInterval(intervaloCards);
       clearInterval(intervaloGrafico);
     };
@@ -120,7 +120,7 @@ export default function SystemDetail() {
   for (const r of history) {
     const dataValida = r.recorded_at || new Date().toISOString();
     const dataObj = new Date(dataValida);
-    
+
     // Cria uma chave para isolar o ano, mês, dia e hora cheia
     const chaveHora = `${dataObj.getFullYear()}-${dataObj.getMonth()}-${dataObj.getDate()}-${dataObj.getHours()}`;
 
@@ -226,13 +226,12 @@ export default function SystemDetail() {
               {alarms.map((a) => {
                 const c =
                   a.severity === "critical" ? "text-status-alert" :
-                  a.severity === "warning" ? "text-status-warn" : "text-muted-foreground";
+                    a.severity === "warning" ? "text-status-warn" : "text-muted-foreground";
                 return (
                   <div key={a.id} className="py-3 flex items-start gap-3">
-                    <div className={`w-2 h-2 rounded-full mt-2 ${
-                      a.severity === "critical" ? "bg-status-alert pulse-alert" :
-                      a.severity === "warning" ? "bg-status-warn" : "bg-status-offline"
-                    }`} />
+                    <div className={`w-2 h-2 rounded-full mt-2 ${a.severity === "critical" ? "bg-status-alert pulse-alert" :
+                        a.severity === "warning" ? "bg-status-warn" : "bg-status-offline"
+                      }`} />
                     <div className="flex-1">
                       <div className="flex items-center justify-between gap-4">
                         <span className={`text-xs font-bold uppercase tracking-widest ${c}`}>{a.severity}</span>
@@ -298,9 +297,8 @@ function EngineeringPanel({
             <button
               key={u}
               onClick={() => setUnit(u)}
-              className={`px-2.5 py-1 rounded-sm uppercase tracking-widest transition ${
-                unit === u ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`px-2.5 py-1 rounded-sm uppercase tracking-widest transition ${unit === u ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               {u}
             </button>
