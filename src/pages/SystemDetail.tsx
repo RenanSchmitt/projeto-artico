@@ -33,38 +33,78 @@ export default function SystemDetail() {
   useEffect(() => {
     if (!id || !user) return;
     let cancelled = false;
-    async function fetchAll() {
-      supabase.functions.invoke("simulate-tick").catch(() => {});
 
-      const since = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
-      const [{ data: ch }, { data: hist }, { data: alm }] = await Promise.all([
-        supabase.from("chambers").select("*").eq("id", id).maybeSingle(),
-        supabase
+    // Dispara a simulação uma vez ao carregar
+    supabase.functions.invoke("simulate-tick").catch(() => {});
+
+    // ⚡ MOTOR 1: Atualiza o bloco de Temperatura rápido (a cada 10 segundos)
+    async function fetchLatest() {
+      try {
+        const { data: latestData } = await supabase
           .from("telemetry")
-          .select("temperature, compressor_on, defrost_on, door_open, recorded_at, suction_pressure, evaporation_pressure, superheat, subcooling, condensation_temp, eev_opening, eev_steps")
+          .select("chamber_id, temperature, compressor_on, defrost_on, door_open, recorded_at")
           .eq("chamber_id", id)
-          .gte("recorded_at", since)
-          .order("recorded_at", { ascending: true }),
-        supabase
+          .order("recorded_at", { ascending: false })
+          .limit(1);
+
+        if (latestData && latestData.length > 0 && !cancelled) {
+          setLatest(latestData[0] as unknown as Reading);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar dado instantâneo:", err);
+      }
+    }
+
+    // 🔄 MOTOR 2: Busca o histórico longo e os alarmes de hora em hora (ou 1x ao carregar)
+    async function fetchHistoryAndMeta() {
+      try {
+        // Busca dados estáticos da câmara
+        const { data: ch } = await supabase.from("chambers").select("*").eq("id", id).maybeSingle();
+        if (cancelled) return;
+        if (ch) {
+          setChamber(ch);
+          const { data: tn } = await supabase.from("tenants").select("name").eq("id", ch.tenant_id).maybeSingle();
+          if (!cancelled) setTenantName(tn?.name ?? "");
+        }
+
+        // Traz as amostras para o gráfico (agora focado em um bloco histórico fixo)
+        const { data: hist } = await supabase
+          .from("telemetry")
+          .select("chamber_id, temperature, recorded_at")
+          .eq("chamber_id", id)
+          .order("recorded_at", { ascending: false })
+          .limit(1000); 
+
+        if (!cancelled) {
+          setHistory(hist ? (hist as unknown as Reading[]).reverse() : []);
+        }
+
+        const { data: alm } = await supabase
           .from("alarms")
           .select("*")
           .eq("chamber_id", id)
           .order("created_at", { ascending: false })
-          .limit(10),
-      ]);
-      if (cancelled) return;
-      setChamber(ch);
-      setHistory(hist ?? []);
-      setLatest(hist && hist.length ? hist[hist.length - 1] : null);
-      setAlarms(alm ?? []);
-      if (ch) {
-        const { data: tn } = await supabase.from("tenants").select("name").eq("id", ch.tenant_id).maybeSingle();
-        if (!cancelled) setTenantName(tn?.name ?? "");
+          .limit(10);
+
+        if (!cancelled) setAlarms(alm ?? []);
+      } catch (err) {
+        console.error("Erro ao carregar histórico estrutural:", err);
       }
     }
-    fetchAll();
-    const i = setInterval(fetchAll, 10_000);
-    return () => { cancelled = true; clearInterval(i); };
+
+    // Executa tudo na primeira montagem da página
+    fetchLatest();
+    fetchHistoryAndMeta();
+
+    // Loops com tempos diferentes para economizar processamento e fixar o gráfico
+    const intervaloCards = setInterval(fetchLatest, 10_000);       // Cards mudam a cada 10 segundos
+    const intervaloGrafico = setInterval(fetchHistoryAndMeta, 3_600_000); // Gráfico só mexe a cada 1 hora (3600000 ms)
+
+    return () => { 
+      cancelled = true; 
+      clearInterval(intervaloCards);
+      clearInterval(intervaloGrafico);
+    };
   }, [id, user]);
 
   if (loading) return null;
@@ -73,11 +113,27 @@ export default function SystemDetail() {
   const temp = latest ? Number(latest.temperature) : null;
   const alert = chamber && temp !== null && (temp > Number(chamber.max_temp) || temp < Number(chamber.min_temp));
 
-  const chartData = history.map((r) => ({
-    t: new Date(r.recorded_at).getTime(),
-    label: new Date(r.recorded_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-    temperature: Number(r.temperature),
-  }));
+  // 🕒 FILTRO DE HORA EM HORA APLICADO AQUI:
+  const chartData = [];
+  const horasProcessadas = new Set();
+
+  for (const r of history) {
+    const dataValida = r.recorded_at || new Date().toISOString();
+    const dataObj = new Date(dataValida);
+    
+    // Cria uma chave para isolar o ano, mês, dia e hora cheia
+    const chaveHora = `${dataObj.getFullYear()}-${dataObj.getMonth()}-${dataObj.getDate()}-${dataObj.getHours()}`;
+
+    // Só deixa passar para o gráfico o primeiro ponto encontrado de cada hora
+    if (!horasProcessadas.has(chaveHora)) {
+      horasProcessadas.add(chaveHora);
+      chartData.push({
+        t: dataObj.getTime(),
+        label: dataObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        temperature: Number(r.temperature),
+      });
+    }
+  }
 
   return (
     <Layout>
@@ -122,9 +178,9 @@ export default function SystemDetail() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-xs uppercase tracking-widest text-muted-foreground">Telemetria</div>
-              <h2 className="text-lg font-bold">Últimas 12 horas</h2>
+              <h2 className="text-lg font-bold">Últimas horas</h2>
             </div>
-            <div className="text-xs text-muted-foreground">{chartData.length} amostras</div>
+            <div className="text-xs text-muted-foreground">{chartData.length} horas registradas</div>
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -227,11 +283,6 @@ function EngineeringPanel({
   const eevPct = latest?.eev_opening ?? 0;
   const eevSteps = latest?.eev_steps ?? 0;
 
-  const statusColor = (s: string) =>
-    s === "ok" ? "text-status-ok" : s === "alert" ? "text-status-alert" : "text-status-offline";
-  const statusBg = (s: string) =>
-    s === "ok" ? "bg-status-ok" : s === "alert" ? "bg-status-alert" : "bg-status-offline";
-
   return (
     <Card className="p-5 font-mono">
       <div className="flex items-center justify-between mb-4">
@@ -257,7 +308,6 @@ function EngineeringPanel({
         </div>
       </div>
 
-      {/* Pressures */}
       <div className="grid gap-3 sm:grid-cols-2 mb-4">
         <PlcGauge
           label="Pressão de Sucção"
@@ -275,7 +325,6 @@ function EngineeringPanel({
         />
       </div>
 
-      {/* Thermo perf */}
       <div className="grid gap-3 sm:grid-cols-3 mb-4">
         <PlcMetric
           label="Super-aquecimento (SH)"
@@ -297,7 +346,6 @@ function EngineeringPanel({
         />
       </div>
 
-      {/* EEV */}
       <div className="border border-border rounded-md p-4 bg-secondary/40">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
