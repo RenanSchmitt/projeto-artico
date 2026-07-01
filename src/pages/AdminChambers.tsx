@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
-import { Trash2, Shield, Building, Cpu, ArrowLeft, Copy, Check } from "lucide-react";
+import { Trash2, Shield, Building, Cpu, ArrowLeft, Copy, Check, Pencil, X } from "lucide-react";
 
 type Tenant = { id: string; name: string };
 type Chamber = { 
@@ -28,10 +28,13 @@ export default function AdminChamberManager() {
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   
+  // 🔄 Estado de controle: se tiver uma ID aqui, estamos editando. Se for null, estamos cadastrando.
+  const [editingChamberId, setEditingChamberId] = useState<string | null>(null);
+
   // Controle de Modo Virtual (Simulado) ou Real (Hardware)
   const [isVirtualMode, setIsVirtualMode] = useState<boolean>(true);
 
-  // Estados do formulário de cadastro
+  // Estados do formulário de cadastro / edição
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [selectedTenantId, setSelectedTenantId] = useState("");
@@ -87,7 +90,33 @@ export default function AdminChamberManager() {
     }
   };
 
-  const handleCreateChamber = async (e: React.FormEvent) => {
+  // 🛠️ Ativa o Modo de Edição no formulário jogando os dados da linha nos inputs
+  const startEdit = (ch: Chamber) => {
+    setEditingChamberId(ch.id);
+    setName(ch.name);
+    setLocation(ch.location || "");
+    setSelectedTenantId(ch.tenant_id);
+    setSetpoint(String(ch.setpoint));
+    setMinTemp(String(ch.min_temp));
+    setMaxTemp(String(ch.max_temp));
+
+    // Scroll suave para o formulário no topo para facilitar a experiência do usuário
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // ❌ Cancela a Edição e limpa os campos para o padrão de cadastro
+  const cancelEdit = () => {
+    setEditingChamberId(null);
+    setName("");
+    setLocation("");
+    setSelectedTenantId("");
+    setSetpoint("-18.0");
+    setMinTemp("-22.0");
+    setMaxTemp("-15.0");
+  };
+
+  // 🚀 Gerencia o envio único (Criação ou Atualização)
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !selectedTenantId) {
       toast({
@@ -98,34 +127,64 @@ export default function AdminChamberManager() {
       return;
     }
 
+    if (Number(minTemp) >= Number(maxTemp)) {
+      toast({
+        title: "Erro operacional",
+        description: "A temperatura mínima não pode ser maior ou igual à máxima.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const { error } = await supabase.from("chambers").insert([
-        {
-          name: name,
-          location: location || null,
-          tenant_id: selectedTenantId,
-          setpoint: Number(setpoint),
-          min_temp: Number(minTemp),
-          max_temp: Number(maxTemp),
-        },
-      ]);
+      if (editingChamberId) {
+        // Modo Edição: Faz UPDATE no banco
+        const { error } = await supabase
+          .from("chambers")
+          .update({
+            name: name,
+            location: location || null,
+            tenant_id: selectedTenantId,
+            setpoint: Number(setpoint),
+            min_temp: Number(minTemp),
+            max_temp: Number(maxTemp),
+          })
+          .eq("id", editingChamberId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: "Sucesso!",
-        description: `A câmara "${name}" foi vinculada ao cliente com sucesso.`,
-      });
+        toast({
+          title: "Parâmetros Atualizados!",
+          description: `A câmara "${name}" teve suas configurações salvas com sucesso.`,
+        });
+      } else {
+        // Modo Cadastro: Faz INSERT no banco
+        const { error } = await supabase.from("chambers").insert([
+          {
+            name: name,
+            location: location || null,
+            tenant_id: selectedTenantId,
+            setpoint: Number(setpoint),
+            min_temp: Number(minTemp),
+            max_temp: Number(maxTemp),
+          },
+        ]);
 
-      setName("");
-      setLocation("");
-      setSelectedTenantId("");
+        if (error) throw error;
+
+        toast({
+          title: "Sucesso!",
+          description: `A câmara "${name}" foi vinculada ao cliente com sucesso.`,
+        });
+      }
+
+      cancelEdit();
       fetchData();
     } catch (err: any) {
       console.error(err);
       toast({
-        title: "Erro ao criar câmara",
+        title: editingChamberId ? "Erro ao atualizar" : "Erro ao criar câmara",
         description: err.message || "Erro no banco de dados.",
         variant: "destructive",
       });
@@ -145,6 +204,7 @@ export default function AdminChamberManager() {
         title: "Câmara removida",
         description: `A câmara "${chamberName}" foi excluída com sucesso.`,
       });
+      if (editingChamberId === id) cancelEdit();
       fetchData();
     } catch (err: any) {
       console.error(err);
@@ -156,7 +216,6 @@ export default function AdminChamberManager() {
     }
   };
 
-  // Função auxiliar para copiar o ID do Hardware
   const copyToClipboard = (id: string) => {
     navigator.clipboard.writeText(id);
     setCopiedId(id);
@@ -214,20 +273,30 @@ export default function AdminChamberManager() {
         </CardContent>
       </Card>
 
-      {/* FORMULÁRIO DE CADASTRO */}
-      <Card className="border-border bg-card">
+      {/* FORMULÁRIO DE CADASTRO / EDICAO DINÂMICO */}
+      <Card className={`border-border bg-card transition-all ${editingChamberId ? 'ring-1 ring-amber-500/50 shadow-md shadow-amber-500/5' : ''}`}>
         <CardHeader>
-          <CardTitle className="text-xl font-bold tracking-wide flex items-center gap-2">
-            <Shield className="w-5 h-5 text-primary" /> CADASTRAR NOVA CÂMARA
+          <CardTitle className="text-xl font-bold tracking-wide flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className={`w-5 h-5 ${editingChamberId ? "text-amber-500" : "text-primary"}`} /> 
+              {editingChamberId ? "EDITAR CONFIGURAÇÕES DA CÂMARA" : "CADASTRAR NOVA CÂMARA"}
+            </div>
+            {editingChamberId && (
+              <Button type="button" variant="ghost" size="sm" onClick={cancelEdit} className="text-muted-foreground hover:text-foreground h-8 px-2">
+                <X className="w-4 h-4 mr-1" /> Cancelar Edição
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleCreateChamber} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">Cliente / Empresa Destino</label>
               <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione o cliente responsável" />
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cliente responsável" />
+                  </SelectTrigger>
                 </SelectTrigger>
                 <SelectContent>
                   {tenants.map((tenant) => (
@@ -256,18 +325,25 @@ export default function AdminChamberManager() {
                 <Input type="number" step="0.1" value={setpoint} onChange={(e) => setSetpoint(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Temp. Mínima (°C)</label>
+                <label className="text-sm font-medium text-status-warn">Temp. Mínima (°C)</label>
                 <Input type="number" step="0.1" value={minTemp} onChange={(e) => setMinTemp(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Temp. Máxima (°C)</label>
+                <label className="text-sm font-medium text-status-alert">Temp. Máxima (°C)</label>
                 <Input type="number" step="0.1" value={maxTemp} onChange={(e) => setMaxTemp(e.target.value)} />
               </div>
             </div>
 
-            <Button type="submit" className="w-full mt-2" disabled={loading}>
-              {loading ? "Processando..." : "Salvar e Vincular Câmara"}
-            </Button>
+            <div className="flex gap-3 mt-2">
+              {editingChamberId && (
+                <Button type="button" variant="outline" className="w-1/4" onClick={cancelEdit} disabled={loading}>
+                  Cancelar
+                </Button>
+              )}
+              <Button type="submit" className={`flex-1 ${editingChamberId ? "bg-amber-600 hover:bg-amber-500 text-white" : ""}`} disabled={loading}>
+                {loading ? "Processando..." : editingChamberId ? "Salvar Parâmetros da Câmara" : "Salvar e Vincular Câmara"}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
@@ -299,14 +375,14 @@ export default function AdminChamberManager() {
                 ) : (
                   chambers.map((ch) => {
                     const client = tenants.find((t) => t.id === ch.tenant_id);
+                    const isRowEditing = editingChamberId === ch.id;
                     return (
-                      <tr key={ch.id} className="hover:bg-muted/40 transition-colors">
+                      <tr key={ch.id} className={`transition-colors ${isRowEditing ? 'bg-amber-500/10 hover:bg-amber-500/15' : 'hover:bg-muted/40'}`}>
                         <td className="p-4 font-semibold text-primary">{client ? client.name : "⚠️ Sem Empresa"}</td>
                         <td className="p-4 font-bold">
                           {ch.name}
                           {ch.location && <span className="block text-xs font-normal text-muted-foreground">{ch.location}</span>}
                         </td>
-                        {/* 🛠️ NOVA COLUNA PARA COPIAR O ID EXATO DO HARDWARE */}
                         <td className="p-4">
                           <div className="flex items-center gap-2 bg-muted/60 px-2 py-1 rounded border border-border max-w-[220px]">
                             <span className="text-xs font-mono truncate text-muted-foreground">{ch.id}</span>
@@ -328,10 +404,22 @@ export default function AdminChamberManager() {
                             <span>Max: <strong className="text-foreground">{ch.max_temp}°C</strong></span>
                           </div>
                         </td>
-                        <td className="p-4 text-center">
-                          <Button variant="destructive" size="icon" className="w-8 h-8 rounded-md" onClick={() => handleDeleteChamber(ch.id, ch.name)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                        <td className="p-4">
+                          <div className="flex items-center justify-center gap-2">
+                            {/* ✏️ BOTÃO EDITAR INJETADO */}
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className={`w-8 h-8 rounded-md ${isRowEditing ? 'border-amber-500 text-amber-500 bg-amber-500/10' : ''}`}
+                              onClick={() => startEdit(ch)}
+                              title="Editar câmara"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button variant="destructive" size="icon" className="w-8 h-8 rounded-md" onClick={() => handleDeleteChamber(ch.id, ch.name)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
