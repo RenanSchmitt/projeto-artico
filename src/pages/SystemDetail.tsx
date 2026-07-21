@@ -37,12 +37,12 @@ export default function SystemDetail() {
     // Dispara a simulação uma vez ao carregar
     supabase.functions.invoke("simulate-tick").catch(() => { });
 
-    // ⚡ MOTOR 1: Atualiza o bloco de Temperatura rápido (a cada 10 segundos)
+    // ⚡ MOTOR 1: Atualiza o bloco de Temperatura e Painel de Engenharia (a cada 10 segundos)
     async function fetchLatest() {
       try {
         const { data: latestData } = await supabase
           .from("telemetry")
-          .select("chamber_id, temperature, compressor_on, defrost_on, door_open, recorded_at")
+          .select("*") // 👈 Traz todas as colunas para alimentar o Painel de Engenharia
           .eq("chamber_id", id)
           .order("recorded_at", { ascending: false })
           .limit(1);
@@ -67,7 +67,7 @@ export default function SystemDetail() {
           if (!cancelled) setTenantName(tn?.name ?? "");
         }
 
-        // Traz as amostras para o gráfico (agora focado em um bloco histórico fixo)
+        // Traz as amostras para o gráfico
         const { data: hist } = await supabase
           .from("telemetry")
           .select("chamber_id, temperature, recorded_at")
@@ -96,7 +96,7 @@ export default function SystemDetail() {
     fetchLatest();
     fetchHistoryAndMeta();
 
-    // Loops ajustados para sincronizar com o novo tempo da ESP32 (1 minuto)
+    // Loops ajustados para sincronizar
     const intervaloCards = setInterval(fetchLatest, 10_000);       // Cards atualizam rápido a cada 10 segundos
     const intervaloGrafico = setInterval(fetchHistoryAndMeta, 60_000); // Gráfico atualiza a cada 1 minuto
 
