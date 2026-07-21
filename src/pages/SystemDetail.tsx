@@ -42,7 +42,7 @@ export default function SystemDetail() {
       try {
         const { data: latestData } = await supabase
           .from("telemetry")
-          .select("*") // 👈 Traz todas as colunas para alimentar o Painel de Engenharia
+          .select("*") // Traz todas as colunas para alimentar o Painel de Engenharia
           .eq("chamber_id", id)
           .order("recorded_at", { ascending: false })
           .limit(1);
@@ -55,7 +55,7 @@ export default function SystemDetail() {
       }
     }
 
-    // 🔄 MOTOR 2: Busca o histórico longo e os alarmes de hora em hora (ou 1x ao carregar)
+    // 🔄 MOTOR 2: Busca o histórico longo e os alarmes
     async function fetchHistoryAndMeta() {
       try {
         // Busca dados estáticos da câmara
@@ -97,8 +97,8 @@ export default function SystemDetail() {
     fetchHistoryAndMeta();
 
     // Loops ajustados para sincronizar
-    const intervaloCards = setInterval(fetchLatest, 10_000);       // Cards atualizam rápido a cada 10 segundos
-    const intervaloGrafico = setInterval(fetchHistoryAndMeta, 60_000); // Gráfico atualiza a cada 1 minuto
+    const intervaloCards = setInterval(fetchLatest, 10_000);       // Cards atualizam a cada 10s
+    const intervaloGrafico = setInterval(fetchHistoryAndMeta, 60_000); // Gráfico atualiza a cada 1m
 
     return () => {
       cancelled = true;
@@ -113,24 +113,39 @@ export default function SystemDetail() {
   const temp = latest ? Number(latest.temperature) : null;
   const alert = chamber && temp !== null && (temp > Number(chamber.max_temp) || temp < Number(chamber.min_temp));
 
-  // 🕒 FILTRO DE HORA EM HORA APLICADO AQUI:
+  // 🕒 CORREÇÃO DA LINHA DO TEMPO:
+  // Filtra por intervalos fixos de 30 minutos para manter a fidelidade da onda no tempo
   const chartData = [];
-  const horasProcessadas = new Set();
+  let ultimoTempo = 0;
+  const INTERVALO_MS = 30 * 60 * 1000; // 30 minutos em milissegundos
 
   for (const r of history) {
     const dataValida = r.recorded_at || new Date().toISOString();
     const dataObj = new Date(dataValida);
+    const t = dataObj.getTime();
 
-    // Cria uma chave para isolar o ano, mês, dia e hora cheia
-    const chaveHora = `${dataObj.getFullYear()}-${dataObj.getMonth()}-${dataObj.getDate()}-${dataObj.getHours()}`;
-
-    // Só deixa passar para o gráfico o primeiro ponto encontrado de cada hora
-    if (!horasProcessadas.has(chaveHora)) {
-      horasProcessadas.add(chaveHora);
+    // Pega 1 leitura a cada 30 min (ou a primeira leitura disponível)
+    if (t - ultimoTempo >= INTERVALO_MS || chartData.length === 0) {
       chartData.push({
-        t: dataObj.getTime(),
+        t: t,
         label: dataObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
         temperature: Number(r.temperature),
+      });
+      ultimoTempo = t;
+    }
+  }
+
+  // Garantia: O último ponto retornado do banco SEMPRE é incluído no gráfico
+  if (history.length > 0) {
+    const ultimaLeitura = history[history.length - 1];
+    const dataUltima = new Date(ultimaLeitura.recorded_at);
+    const tUltimo = dataUltima.getTime();
+
+    if (chartData.length > 0 && chartData[chartData.length - 1].t !== tUltimo) {
+      chartData.push({
+        t: tUltimo,
+        label: dataUltima.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        temperature: Number(ultimaLeitura.temperature),
       });
     }
   }
@@ -180,7 +195,7 @@ export default function SystemDetail() {
               <div className="text-xs uppercase tracking-widest text-muted-foreground">Telemetria</div>
               <h2 className="text-lg font-bold">Últimas horas</h2>
             </div>
-            <div className="text-xs text-muted-foreground">{chartData.length} horas registradas</div>
+            <div className="text-xs text-muted-foreground">{chartData.length} pontos exibidos</div>
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -192,7 +207,7 @@ export default function SystemDetail() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} />
-                <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={10} interval="preserveStartEnd" minTickGap={48} />
+                <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={10} minTickGap={25} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} unit="°" width={40} />
                 {chamber && (
                   <>
