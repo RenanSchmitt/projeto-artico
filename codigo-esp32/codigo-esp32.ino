@@ -17,7 +17,7 @@ const char* supabase_base_url = "https://vpmukocqdtljdxqndwts.supabase.co/rest/v
 const char* supabase_key      = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwbXVrb2NxZHRsamR4cW5kd3RzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NTM4NDgsImV4cCI6MjA5NTMyOTg0OH0.AEKSUKqtOVgyciUAlmXhN9nHcBtuRt1TykDQII_dtJ0"; 
 
 // =========================================================================
-// 3. ESTRUTURA E CADASTRO DAS ILHAS (Adicione novas ilhas no array abaixo)
+// 3. ESTRUTURA E CADASTRO DAS ILHAS
 // =========================================================================
 struct Ilha {
   const char* chamber_id;        // ID da câmara no Supabase
@@ -28,7 +28,7 @@ struct Ilha {
   unsigned long intervaloDegelo; // Intervalo de 4 horas
   unsigned long duracaoDegelo;   // Duração de 15 minutos
   
-  // Variáveis de controle interno (gerenciadas pelo código)
+  // Variáveis de controle interno
   float tempAtual;
   bool compressor_on;
   bool defrost_on;
@@ -36,7 +36,6 @@ struct Ilha {
 };
 
 // Cadastro das Ilhas
-// Estrutura: { "ID_SUPABASE", SetPoint, TempMin, TempMax, IntervaloDegelo(ms), DuracaoDegelo(ms) }
 Ilha ilhas[] = {
   { "248613ed-9ae0-4592-8519-032b17f95f22", -18.0, -22.0, -15.0, (4 * 60 * 60 * 1000UL), (15 * 60 * 1000UL), 0.0, false, false, 0 }, // Ilha 1 (Sensor Index 0)
   { "1b56a4c7-8c3d-4aa7-a3de-4fd511aaf536", -18.0, -22.0, -15.0, (4 * 60 * 60 * 1000UL), (15 * 60 * 1000UL), 0.0, false, false, 0 }  // Ilha 2 (Sensor Index 1)
@@ -76,23 +75,29 @@ void buscarParametrosSupabase(Ilha &ilha) {
     if (httpCode == 200) {
       String payload = http.getString();
       
-      // Parse manual para ler os valores sem sobrecarregar com bibliotecas extras
       int posSetPoint = payload.indexOf("\"setpoint\":");
-      int posMin = payload.indexOf("\"min_temp\":");
-      int posMax = payload.indexOf("\"max_temp\":");
+      int posMin      = payload.indexOf("\"min_temp\":");
+      int posMax      = payload.indexOf("\"max_temp\":");
 
       if (posSetPoint != -1) {
-        float val = payload.substring(posSetPoint + 11, payload.indexOf(",", posSetPoint)).toFloat();
+        int inicio = posSetPoint + 11;
+        int fim = payload.indexOf(",", inicio);
+        if (fim == -1) fim = payload.indexOf("}", inicio);
+        float val = payload.substring(inicio, fim).toFloat();
         if (val != 0.0) ilha.setPoint = val;
       }
       if (posMin != -1) {
-        float val = payload.substring(posMin + 11, payload.indexOf(",", posMin)).toFloat();
+        int inicio = posMin + 11;
+        int fim = payload.indexOf(",", inicio);
+        if (fim == -1) fim = payload.indexOf("}", inicio);
+        float val = payload.substring(inicio, fim).toFloat();
         if (val != 0.0) ilha.tempMin = val;
       }
       if (posMax != -1) {
-        int posFim = payload.indexOf("}", posMax);
-        if (posFim == -1) posFim = payload.indexOf(",", posMax);
-        float val = payload.substring(posMax + 11, posFim).toFloat();
+        int inicio = posMax + 11;
+        int fim = payload.indexOf(",", inicio);
+        if (fim == -1 || fim > payload.indexOf("}", inicio)) fim = payload.indexOf("}", inicio);
+        float val = payload.substring(inicio, fim).toFloat();
         if (val != 0.0) ilha.tempMax = val;
       }
     }
@@ -113,7 +118,6 @@ void enviarTelemetria(Ilha &ilha, int numero_ilha) {
     http.addHeader("apikey", supabase_key);
     http.addHeader("Authorization", ("Bearer " + String(supabase_key)).c_str());
 
-    // Dados complementares
     float suction_pressure     = 1.4;                  
     float evaporation_pressure = 1.3;                  
     float superheat            = 7.2;                  
@@ -183,9 +187,8 @@ void loop() {
   // 1. SINCRONIZAÇÃO DE PARÂMETROS DO SUPABASE (Ao ligar e a cada 5 min)
   // -----------------------------------------------------------------------
   if (agora - ultimaBuscaParametros >= intervaloParametros || ultimaBuscaParametros == 0) {
-    ultimaBuscaParametros = agora;
-    
     if (WiFi.status() == WL_CONNECTED) {
+      ultimaBuscaParametros = agora; // Atualiza o cronômetro SOMENTE após conectar
       Serial.println("\n🔄 [SYNC] Buscando Setpoints e Limites atualizados no Supabase...");
       for (int i = 0; i < totalIlhas; i++) {
         buscarParametrosSupabase(ilhas[i]);
@@ -200,11 +203,10 @@ void loop() {
   sensors.requestTemperatures(); 
 
   for (int i = 0; i < totalIlhas; i++) {
-    // A) Leitura de Temperatura da Ilha
     float temp = sensors.getTempCByIndex(i);
     ilhas[i].tempAtual = (temp == DEVICE_DISCONNECTED_C) ? -15.0 : temp;
 
-    // B) Lógica de Degelo Individual (4h operação / 15min degelo)
+    // Degelo
     if (!ilhas[i].defrost_on && (agora - ilhas[i].inicioUltimoDegelo >= ilhas[i].intervaloDegelo)) {
       ilhas[i].defrost_on = true;
       ilhas[i].inicioUltimoDegelo = agora;
@@ -216,15 +218,13 @@ void loop() {
       Serial.printf("\n🔥 [ILHA %d] Finalizou MODO DEGELO!\n", i + 1);
     }
 
-    // C) Lógica do Compressor usando SetPoint, Max e Min obtidos do Supabase
+    // Compressor
     if (ilhas[i].defrost_on) {
-      ilhas[i].compressor_on = false; // Compressor desligado durante o degelo
+      ilhas[i].compressor_on = false; 
     } else {
-      // Liga se esquentar até/acima da Temp. Máxima
       if (ilhas[i].tempAtual >= ilhas[i].tempMax) {
         ilhas[i].compressor_on = true;  
       } 
-      // Desliga se esfriar até o SetPoint OU atingir a Temp. Mínima de Segurança
       else if (ilhas[i].tempAtual <= ilhas[i].setPoint || ilhas[i].tempAtual <= ilhas[i].tempMin) {
         ilhas[i].compressor_on = false; 
       }
