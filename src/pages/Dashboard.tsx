@@ -8,9 +8,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/hooks/useAuth";
 import { Thermometer, Snowflake, DoorOpen, DoorClosed, Power } from "lucide-react";
 
-type Chamber = { id: string; name: string; location: string | null; setpoint: number; min_temp: number; max_temp: number; tenant_id: string };
-type Tenant = { id: string; name: string; city: string | null };
-type Reading = { temperature: number; compressor_on: boolean; defrost_on: boolean; door_open: boolean; recorded_at: string };
+type Chamber = { 
+  id: string; 
+  name: string; 
+  location: string | null; 
+  setpoint: number; 
+  min_temp: number; 
+  max_temp: number; 
+  tenant_id: string 
+};
+
+type Tenant = { 
+  id: string; 
+  name: string; 
+  city: string | null 
+};
+
+type Reading = { 
+  temperature: number; 
+  compressor_on: boolean; 
+  defrost_on: boolean; 
+  door_open: boolean; 
+  recorded_at: string 
+};
 
 export default function Dashboard() {
   const { user, role: authRole, loading } = useAuth();
@@ -20,7 +40,7 @@ export default function Dashboard() {
   const [latest, setLatest] = useState<Record<string, Reading>>({});
   const [filter, setFilter] = useState<string>("all");
   
-  // Controle estrito se o usuário logado é de fato o dono do sistema
+  // Controle estrito de acesso do administrador
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
@@ -30,9 +50,7 @@ export default function Dashboard() {
 
     async function fetchData() {
       try {
-        // supabase.functions.invoke("simulate-tick").catch(() => {});
-
-        // 1. REGRA DE OURO: Validação Suprema por Email ou Role do Banco
+        // 1. Validação do Perfil do Usuário
         const { data: profData } = await supabase
           .from("profiles")
           .select("tenant_id, role")
@@ -41,21 +59,25 @@ export default function Dashboard() {
         
         if (cancelled) return;
 
-        // É admin se o email for o seu master OU se o role explicitamente disser admin
-        const checkAdmin = user.email === "admin@gmail.com" || user.email === "admin@admin.com" || profData?.role === "admin" || authRole === "admin";
+        // Validação Admin
+        const checkAdmin = 
+          user.email === "admin@gmail.com" || 
+          user.email === "admin@admin.com" || 
+          profData?.role === "admin" || 
+          authRole === "admin";
+          
         setIsAdmin(checkAdmin);
 
-        // 🩹 BLINDAGEM DO JAIRO: Se for o Jairo e o tenant_id vier nulo do banco, nós forçamos o ID correto do Mercado dele
+        // Ajuste de Tenant para conta de homologação/cliente específico
         let userTenantId = profData?.tenant_id;
         if (!checkAdmin && user.email === "jairo@gmail.com" && !userTenantId) {
-          userTenantId = "d957e08c-31c6-4e75-80b2-53d7da76aacc"; // ID do Mercado do Jairo retirado do seu print image_383780.png
+          userTenantId = "d957e08c-31c6-4e75-80b2-53d7da76aacc";
         }
 
-        // 2. Preparação das Queries para o Banco
+        // 2. Consultas de Clientes e Câmaras
         let tenantsQuery = supabase.from("tenants").select("*").order("name");
         let chambersQuery = supabase.from("chambers").select("*").order("name");
 
-        // 🔐 SEGURANÇA: Se NÃO for admin confirmado, FORÇA o filtro pelo tenant correto.
         if (!checkAdmin) {
           const filterId = userTenantId || "bloqueado-sem-tenant";
           chambersQuery = chambersQuery.eq("tenant_id", filterId);
@@ -69,7 +91,7 @@ export default function Dashboard() {
 
         if (cancelled) return;
 
-        // 3. Segunda Camada de Proteção Hardcoded no Estado do React
+        // 3. Atualização dos Estados de Clientes e Câmaras
         if (!checkAdmin) {
           const filterId = userTenantId || "bloqueado-sem-tenant";
           setTenants(ts ? ts.filter(t => t.id === filterId) : []);
@@ -79,7 +101,7 @@ export default function Dashboard() {
           setChambers(chs ?? []);
         }
 
-        // 4. Busca da Telemetria apenas para o que passou no filtro operacional
+        // 4. Busca da Telemetria com Retenção de Estado
         const validChambers = chs ?? [];
         const filteredChs = !checkAdmin
           ? validChambers.filter(c => c.tenant_id === (userTenantId || "bloqueado-sem-tenant"))
@@ -87,18 +109,35 @@ export default function Dashboard() {
 
         if (filteredChs.length > 0) {
           const ids = filteredChs.map((c) => c.id);
+          
           const { data: tel } = await supabase
             .from("telemetry")
             .select("chamber_id, temperature, compressor_on, defrost_on, door_open, recorded_at")
             .in("chamber_id", ids)
-            .order("recorded_at", { ascending: false })
-            .limit(ids.length * 5);
+            .order("recorded_at", { ascending: false });
 
-          const map: Record<string, Reading> = {};
-          for (const r of tel ?? []) {
-            if (!map[r.chamber_id]) map[r.chamber_id] = r;
+          if (tel && tel.length > 0) {
+            setLatest((prevLatest) => {
+              const updated = { ...prevLatest };
+              
+              // Processa do registro mais antigo ao mais recente
+              const sortedTel = [...tel].reverse();
+
+              for (const r of sortedTel) {
+                const actualReading = r as Reading;
+                const currentStored = updated[actualReading.chamber_id];
+
+                // Atualiza se for a primeira leitura ou se o registro for mais novo/igual
+                if (
+                  !currentStored || 
+                  new Date(actualReading.recorded_at) >= new Date(currentStored.recorded_at)
+                ) {
+                  updated[actualReading.chamber_id] = actualReading;
+                }
+              }
+              return updated;
+            });
           }
-          setLatest(map);
         }
       } catch (error) {
         console.error("Erro no fluxo do painel:", error);
@@ -106,14 +145,15 @@ export default function Dashboard() {
     }
 
     fetchData();
-    const i = setInterval(fetchData, 10_000);
+    const interval = setInterval(fetchData, 10_000);
+    
     return () => {
       cancelled = true;
-      clearInterval(i);
+      clearInterval(interval);
     };
   }, [user, authRole, loading]);
 
-  // 5. Filtro visual na tela (Exclusivo Admin)
+  // Filtro visual para Administradores
   const visibleChambers = useMemo(() => {
     if (!chambers) return [];
     if (isAdmin) {
@@ -139,7 +179,6 @@ export default function Dashboard() {
             </p>
           </div>
           
-          {/* 🛑 TRAVA INQUEBRÁVEL NO VISUAL: Só renderiza o seletor se for comprovadamente ADMIN */}
           {isAdmin && tenants && tenants.length > 0 && (
             <Select value={filter} onValueChange={setFilter}>
               <SelectTrigger className="w-[260px]">
