@@ -30,7 +30,7 @@ export default function Dashboard() {
 
     async function fetchData() {
       try {
-        supabase.functions.invoke("simulate-tick").catch(() => {});
+        // supabase.functions.invoke("simulate-tick").catch(() => {});
 
         // 1. REGRA DE OURO: Validação Suprema por Email ou Role do Banco
         const { data: profData } = await supabase

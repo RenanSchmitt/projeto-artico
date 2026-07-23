@@ -13,7 +13,7 @@ export default function HeartbeatBanner({ chamberId }: { chamberId?: string }) {
         <div>
           <div className="font-bold text-status-alert tracking-wide uppercase text-sm">SISTEMA OFFLINE</div>
           <div className="text-xs text-muted-foreground">
-            Verifique a conexão do Boss Carel · último dado {lastSeen ? formatAge(ageMs) : "nunca recebido"}
+            Verifique a conexão com a central · último dado {lastSeen ? formatAge(ageMs) : "nunca recebido"}
           </div>
         </div>
       </Card>
@@ -25,7 +25,7 @@ export default function HeartbeatBanner({ chamberId }: { chamberId?: string }) {
       <div className="w-3 h-3 rounded-full bg-status-ok pulse-ok" />
       <Activity className="text-status-ok w-5 h-5" />
       <div className="flex-1">
-        <div className="text-sm font-bold uppercase tracking-wide text-status-ok">Boss Carel · Online</div>
+        <div className="text-sm font-bold uppercase tracking-wide text-status-ok">Monitoramente · Online</div>
         <div className="text-xs text-muted-foreground">Último heartbeat {formatAge(ageMs)}</div>
       </div>
     </Card>
