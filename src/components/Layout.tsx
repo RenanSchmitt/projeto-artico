@@ -52,7 +52,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               <div className="text-left">
                 <div className="font-bold tracking-wide leading-none">FRIO<span className="text-primary">CTRL</span></div>
                 {/* O subtítulo só aparece em telas maiores (sm) */}
-                <div className="text-[10px] text-muted-foreground uppercase tracking-widest hidden sm:block">Boss Carel · Live</div>
+                <div className="text-[10px] text-muted-foreground uppercase tracking-widest hidden sm:block">Monitoramento remoto</div>
               </div>
             </button>
 
