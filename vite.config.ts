@@ -5,8 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  // Se estiver local (development), usa a raiz '/'. Se for build do GitHub Pages, usa '/projeto-artico/'
-  base: mode === "production" ? "/projeto-artico/" : "/", 
+  base: "/", 
   server: {
     host: "::",
     port: 8080,
@@ -19,6 +18,13 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
+    dedupe: [
+      "react", 
+      "react-dom", 
+      "react/jsx-runtime", 
+      "react/jsx-dev-runtime", 
+      "@tanstack/react-query", 
+      "@tanstack/query-core"
+    ],
   },
 }));

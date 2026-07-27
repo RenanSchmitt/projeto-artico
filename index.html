@@ -4,7 +4,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- TODO: Set the document title to the name of your application -->
   <title>R.F Refrigeração · Monitoramento de Câmaras Frias</title>
   <meta name="description" content="Monitoramento industrial em tempo real de câmaras frias com integração Boss Carel.">
   <meta name="author" content="FrioCtrl" />
@@ -15,9 +14,9 @@
     OneSignal.push(function () {
       OneSignal.init({
         appId: "f72d6a18-1a19-48c9-b886-e023d2c49bcb",
-        // Configuração crucial para rodar em subpasta no iOS:
-        serviceWorkerParam: { scope: "/projeto-artico/" },
-        serviceWorkerPath: "projeto-artico/OneSignalSDKWorker.js",
+        // 👈 Ajustado para a raiz do domínio próprio (removido /projeto-artico/)
+        serviceWorkerParam: { scope: "/" },
+        serviceWorkerPath: "/OneSignalSDKWorker.js",
         notifyButton: {
           enable: true, /* Ativa o sininho para ajudar a forçar o clique se o clique na tela falhar */
         },
