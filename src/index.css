@@ -1,79 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Industrial Dark Mode design system */
+/* Grupo Koch / Komprão — Light Corporate design system */
 
 @layer base {
   :root {
-    --background: 0 0% 5%;
-    --foreground: 0 0% 98%;
+    --background: 210 20% 98%;          /* #F8FAFC */
+    --foreground: 222 20% 12%;          /* near black */
 
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;                  /* #FFFFFF */
+    --card-foreground: 222 20% 12%;
 
-    --popover: 0 0% 8%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 20% 12%;
 
-    --primary: 142 100% 50%;
-    --primary-foreground: 0 0% 5%;
+    --primary: 355 96% 45%;             /* Koch Red #E30613 */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 222 20% 12%;
 
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 15% 45%;
 
-    --accent: 0 0% 14%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 210 20% 94%;
+    --accent-foreground: 222 20% 12%;
 
-    --destructive: 0 100% 55%;
+    --destructive: 355 96% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 16%;
-    --input: 0 0% 14%;
-    --ring: 142 100% 50%;
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 355 96% 45%;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
     /* Status semantic */
-    --status-ok: 142 100% 50%;        /* Verde Neon */
-    --status-alert: 0 100% 55%;       /* Vermelho */
-    --status-warn: 38 100% 55%;       /* Âmbar */
-    --status-offline: 0 0% 40%;       /* Cinza */
+    --status-ok: 142 71% 40%;           /* #16A34A */
+    --status-alert: 355 96% 45%;        /* Koch Red */
+    --status-warn: 32 95% 48%;          /* amber */
+    --status-offline: 215 15% 65%;
 
-    /* Glow shadows */
-    --glow-ok: 0 0 20px hsla(293, 91%, 13%, 0.5);
-    --glow-alert: 0 0 24px hsl(0 100% 55% / 0.6);
+    /* Soft shadows */
+    --shadow-card: 0 1px 2px hsl(220 20% 15% / 0.04), 0 4px 12px hsl(220 20% 15% / 0.05);
+    --shadow-alert: 0 0 0 1px hsl(var(--status-alert) / 0.5), 0 8px 24px hsl(var(--status-alert) / 0.18);
 
-    /* Sidebar (unused but keep tokens) */
-    --sidebar-background: 0 0% 7%;
-    --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 142 100% 50%;
-    --sidebar-primary-foreground: 0 0% 5%;
-    --sidebar-accent: 0 0% 12%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 0 0% 16%;
-    --sidebar-ring: 142 100% 50%;
-  }
+    /* legacy tokens kept */
+    --glow-ok: 0 0 0 1px hsl(var(--status-ok) / 0.25);
+    --glow-alert: var(--shadow-alert);
 
-  .dark {
-    --background: 0 0% 5%;
-    --foreground: 0 0% 98%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 20% 20%;
+    --sidebar-primary: 355 96% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 96%;
+    --sidebar-accent-foreground: 222 20% 12%;
+    --sidebar-border: 214 20% 90%;
+    --sidebar-ring: 355 96% 45%;
   }
 }
 
 @layer base {
   * { @apply border-border; }
-  html { @apply dark; }
+  html { color-scheme: light; }
   body {
-    @apply bg-background text-foreground;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    background-image:
-      radial-gradient(ellipse at top, hsl(142 100% 50% / 0.04), transparent 50%),
-      linear-gradient(hsl(0 0% 100% / 0.015) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(0 0% 100% / 0.015) 1px, transparent 1px);
-    background-size: auto, 32px 32px, 32px 32px;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
   }
 }
 
@@ -89,8 +85,9 @@
   .border-status-ok { border-color: hsl(var(--status-ok)); }
   .border-status-alert { border-color: hsl(var(--status-alert)); }
 
+  .shadow-card { box-shadow: var(--shadow-card); }
   .glow-ok { box-shadow: var(--glow-ok); }
-  .glow-alert { box-shadow: var(--glow-alert); }
+  .glow-alert { box-shadow: var(--shadow-alert); }
 
   .pulse-alert {
     animation: pulse-alert 1.2s ease-in-out infinite;
@@ -100,18 +97,23 @@
   }
 }
 
+/* Softer card default in light mode */
+@layer components {
+  .card, [data-card] { box-shadow: var(--shadow-card); }
+}
+
 @keyframes pulse-alert {
   0%, 100% {
-    box-shadow: 0 0 0 0 hsl(0 100% 55% / 0.7), 0 0 20px hsl(0 100% 55% / 0.4);
-    background-color: hsl(0 100% 55%);
+    box-shadow: 0 0 0 0 hsl(var(--status-alert) / 0.5);
+    background-color: hsl(var(--status-alert));
   }
   50% {
-    box-shadow: 0 0 0 12px hsl(0 100% 55% / 0), 0 0 30px hsl(0 100% 55% / 0.8);
-    background-color: hsl(0 100% 65%);
+    box-shadow: 0 0 0 10px hsl(var(--status-alert) / 0);
+    background-color: hsl(var(--status-alert) / 0.85);
   }
 }
 
 @keyframes pulse-ok {
-  0%, 100% { box-shadow: 0 0 8px hsl(142 100% 50% / 0.5); }
-  50% { box-shadow: 0 0 16px hsl(142 100% 50% / 0.9); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }

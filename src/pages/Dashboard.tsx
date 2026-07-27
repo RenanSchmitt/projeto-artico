@@ -198,48 +198,58 @@ export default function Dashboard() {
 
         <HeartbeatBanner />
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {visibleChambers.map((ch) => {
             if (!ch) return null;
             const r = latest[ch.id];
             const tenant = tenants?.find((t) => t.id === ch.tenant_id);
             const temp = r ? Number(r.temperature) : null;
             const alert = temp !== null && (temp > Number(ch.max_temp) || temp < Number(ch.min_temp));
-            
+
             return (
               <Card
                 key={ch.id}
                 onClick={() => nav(`/system/${ch.id}`)}
-                className={`relative cursor-pointer p-5 transition-all hover:scale-[1.01] hover:border-primary/60 ${
-                  alert ? "border-status-alert glow-alert" : "border-border hover:glow-ok"
+                className={`group relative cursor-pointer p-5 bg-card shadow-card transition-all hover:-translate-y-0.5 hover:shadow-lg ${
+                  alert ? "border-status-alert ring-1 ring-status-alert/30" : "hover:border-primary/40"
                 }`}
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                <div className="flex items-start justify-between mb-5">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary/80 mb-0.5">
                       {tenant?.name || "Empresa Vinculada"}
                     </div>
-                    <div className="font-bold text-lg leading-tight">{ch.name}</div>
-                    <div className="text-xs text-muted-foreground">{ch.location}</div>
+                    <div className="font-semibold text-base leading-tight text-foreground truncate">{ch.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{ch.location}</div>
                   </div>
-                  <div className={`w-2.5 h-2.5 rounded-full ${alert ? "pulse-alert" : "bg-status-ok pulse-ok"}`} />
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+                      alert
+                        ? "bg-status-alert/10 text-status-alert"
+                        : "bg-status-ok/10 text-status-ok"
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${alert ? "pulse-alert" : "bg-status-ok pulse-ok"}`} />
+                    {alert ? "Alerta" : "Normal"}
+                  </span>
                 </div>
 
-                <div className="flex items-baseline gap-2">
-                  <Thermometer className={alert ? "text-status-alert" : "text-status-ok"} />
-                  <span className={`text-5xl font-bold tabular-nums ${alert ? "text-status-alert" : "text-status-ok"}`}>
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-5xl font-bold tabular-nums tracking-tight ${alert ? "text-status-alert" : "text-status-ok"}`}>
                     {temp !== null ? temp.toFixed(1) : "—"}
                   </span>
-                  <span className="text-xl text-muted-foreground">°C</span>
+                  <span className="text-2xl font-medium text-muted-foreground">°C</span>
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Setpoint {Number(ch.setpoint).toFixed(1)}°C
+                <div className="text-xs text-muted-foreground mt-1 mb-4">
+                  Setpoint <span className="font-medium text-foreground">{Number(ch.setpoint).toFixed(1)}°C</span>
+                  <span className="mx-1.5 text-border">·</span>
+                  Faixa {Number(ch.min_temp).toFixed(1)} a {Number(ch.max_temp).toFixed(1)}°C
                 </div>
 
-                <div className="mt-4 flex items-center justify-between text-xs">
-                  <Badge label="COMP" on={r?.compressor_on} icon={<Power className="w-3 h-3" />} />
-                  <Badge label="DEGELO" on={r?.defrost_on} icon={<Snowflake className="w-3 h-3" />} />
-                  <Badge
+                <div className="flex items-center gap-2 pt-3 border-t border-border">
+                  <Pill label="COMP" on={r?.compressor_on} icon={<Power className="w-3 h-3" />} />
+                  <Pill label="DEGELO" on={r?.defrost_on} icon={<Snowflake className="w-3 h-3" />} />
+                  <Pill
                     label="PORTA"
                     on={r?.door_open}
                     warn
@@ -255,13 +265,17 @@ export default function Dashboard() {
   );
 }
 
-function Badge({ label, on, icon, warn }: { label: string; on?: boolean; icon: React.ReactNode; warn?: boolean }) {
-  const color = on ? (warn ? "text-status-alert" : "text-status-ok") : "text-status-offline";
+function Pill({ label, on, icon, warn }: { label: string; on?: boolean; icon: React.ReactNode; warn?: boolean }) {
+  const tone = on
+    ? warn
+      ? "bg-status-alert/10 text-status-alert"
+      : "bg-status-ok/10 text-status-ok"
+    : "bg-secondary text-muted-foreground";
   return (
-    <div className={`flex items-center gap-1.5 ${color}`}>
+    <span className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${tone}`}>
       {icon}
-      <span className="font-bold">{label}</span>
+      <span>{label}</span>
       <span className="opacity-70">{on ? "ON" : "OFF"}</span>
-    </div>
+    </span>
   );
 }
