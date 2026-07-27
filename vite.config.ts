@@ -5,8 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  // Se estiver local (development), usa a raiz '/'. Se for build do GitHub Pages, usa '/projeto-artico/'
-  base: mode === "production" ? "/projeto-artico/" : "/", 
+  base: "/", // 👈 Mudei para raiz fixa, pois agora o site está em frioctrl.com.br
   server: {
     host: "::",
     port: 8080,
