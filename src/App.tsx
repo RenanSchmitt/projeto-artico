@@ -24,7 +24,6 @@ const App = () => {
     windowWithOneSignal.OneSignal.push(() => {
       windowWithOneSignal.OneSignal.init({
         appId: "f72d6a18-1a19-48c9-b886-e023d2c49bcb",
-        // 👈 Ajustado para a raiz do domínio próprio (removido /projeto-artico/)
         serviceWorkerPath: "/OneSignalSDKWorker.js",
         serviceWorkerParam: { scope: "/" },
         allowLocalhostAsSecureOrigin: true,
