@@ -18,11 +18,12 @@ export default function Layout({ children }: { children: ReactNode }) {
   const isAdmin = role === "admin" || user?.email === "admin@admin.com";
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card sticky top-0 z-40 shadow-sm">
+    <div className="min-h-screen">
+      <header className="border-b border-border bg-card/60 backdrop-blur-sm sticky top-0 z-40">
         <div className="container flex items-center justify-between h-16">
-
+          
           <div className="flex items-center gap-4">
+            {/* MENU HAMBÚRGUER (Aparece APENAS no mobile) */}
             {isAdmin && (
               <Sheet>
                 <SheetTrigger asChild>
@@ -30,80 +31,67 @@ export default function Layout({ children }: { children: ReactNode }) {
                     <Menu className="w-5 h-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-[260px] bg-card">
-                  <nav className="flex flex-col gap-2 mt-8">
+                <SheetContent side="left" className="w-[240px] bg-card">
+                  <nav className="flex flex-col gap-4 mt-8">
                     <Button variant="ghost" className="justify-start gap-2" onClick={() => nav("/admin")}>
                       <Thermometer className="w-4 h-4 text-primary" /> Gerenciar Câmaras
                     </Button>
                     <Button variant="ghost" className="justify-start gap-2" onClick={() => nav("/admin/users")}>
-                      <Users className="w-4 h-4 text-primary" /> Criar Usuários
+                      <Users className="w-4 h-4 text-blue-500" /> Criar Usuários
                     </Button>
                   </nav>
                 </SheetContent>
               </Sheet>
             )}
 
-            {/* LOGO */}
+            {/* LOGO E NOME (Aparece em todos os tamanhos) */}
             <button onClick={() => nav("/")} className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shadow-sm">
-                <Snowflake className="text-primary-foreground w-5 h-5" />
+              <div className="w-9 h-9 rounded bg-primary/10 border border-primary/40 flex items-center justify-center">
+                <Snowflake className="text-primary w-5 h-5" />
               </div>
-              <div className="text-left leading-tight">
-                <div className="font-bold tracking-tight text-[15px]">
-                  Frio<span className="text-primary">Ctrl</span>
-                </div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-[0.14em] hidden sm:block">
-                  Monitoramento remoto
-                </div>
+              <div className="text-left">
+                <div className="font-bold tracking-wide leading-none">FRIO<span className="text-primary">CTRL</span></div>
+                {/* O subtítulo só aparece em telas maiores (sm) */}
+                <div className="text-[10px] text-muted-foreground uppercase tracking-widest hidden sm:block">Monitoramento remoto</div>
               </div>
             </button>
 
-            {/* Komprão / Grupo Koch badge */}
-            <div className="hidden md:flex items-center gap-2 pl-4 ml-1 border-l border-border">
-              <div className="flex h-9 items-center gap-2.5 rounded-md border border-border bg-secondary/60 px-3">
-                <span className="flex h-5 w-5 items-center justify-center rounded-sm bg-primary text-[10px] font-bold text-primary-foreground">K</span>
-                <div className="leading-tight">
-                  <div className="text-[11px] font-semibold tracking-tight text-foreground">Komprão Atacadista</div>
-                  <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Grupo Koch</div>
-                </div>
-              </div>
-            </div>
-
-
+            {/* LINKS DESKTOP (Aparecem APENAS em telas médias ou maiores) */}
             {isAdmin && (
-              <nav className="hidden lg:flex items-center gap-1 pl-4 ml-1 border-l border-border">
-                <Button
-                  variant="ghost"
-                  size="sm"
+              <nav className="hidden md:flex items-center gap-2 border-l border-border pl-6">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
                   onClick={() => nav("/admin")}
-                  className="text-xs font-medium gap-1.5 h-8 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  className="text-xs font-semibold gap-1.5 h-8 text-muted-foreground hover:text-foreground"
                 >
                   <Thermometer className="w-3.5 h-3.5 text-primary" />
-                  Câmaras
+                  Gerenciar Câmaras
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
+
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
                   onClick={() => nav("/admin/users")}
-                  className="text-xs font-medium gap-1.5 h-8 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  className="text-xs font-semibold gap-1.5 h-8 text-muted-foreground hover:text-foreground"
                 >
-                  <Users className="w-3.5 h-3.5 text-primary" />
-                  Usuários
+                  <Users className="w-3.5 h-3.5 text-blue-500" />
+                  Criar Usuários (Clientes)
                 </Button>
               </nav>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="text-right text-xs hidden sm:block leading-tight">
-              <div className="text-foreground font-medium">{user?.email}</div>
-              <div className="text-muted-foreground uppercase tracking-widest text-[9px]">
+          {/* LADO DIREITO (Logout) */}
+          <div className="flex items-center gap-4">
+            <div className="text-right text-xs hidden sm:block">
+              <div className="text-foreground">{user?.email}</div>
+              <div className="text-muted-foreground uppercase tracking-widest text-[10px]">
                 {isAdmin ? "Administrador" : "Cliente"}
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={logout} className="h-9 gap-2">
+            <Button variant="ghost" size="icon" onClick={logout}>
               <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Sair</span>
             </Button>
           </div>
         </div>

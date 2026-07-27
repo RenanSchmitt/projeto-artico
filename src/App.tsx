@@ -10,7 +10,7 @@ import Auth from "./pages/Auth";
 import Bancada from "./pages/Bancada";
 import NotFound from "./pages/NotFound.tsx";
 
-// 👇 1. IMPORTA A TELA DE USUÁRIOS
+// 👇 1. IMPORTA A NOVA TELA DE USUÁRIOS
 import AdminUsers from "./pages/AdminUsers";
 
 const queryClient = new QueryClient();
@@ -24,9 +24,9 @@ const App = () => {
     windowWithOneSignal.OneSignal.push(() => {
       windowWithOneSignal.OneSignal.init({
         appId: "f72d6a18-1a19-48c9-b886-e023d2c49bcb",
-        // 👈 Ajustado para a raiz do domínio próprio (removido /projeto-artico/)
-        serviceWorkerPath: "/OneSignalSDKWorker.js",
-        serviceWorkerParam: { scope: "/" },
+        // Ajuste exato com a barra inicial para a subpasta do Vite buscar o arquivo na raiz do build
+        serviceWorkerPath: "/projeto-artico/OneSignalSDKWorker.js",
+        serviceWorkerParam: { scope: "/projeto-artico/" },
         allowLocalhostAsSecureOrigin: true,
         notifyButton: {
           enable: true, // Cria o sininho flutuante na tela pra ajudar a forçar o clique
@@ -62,7 +62,7 @@ const App = () => {
             <Route path="/bancada" element={<Bancada />} />
             <Route path="/admin" element={<AdminChambers />} />
             
-            {/* 👇 2. ROTA ADICIONADA SEGUINDO O SEU PADRÃO */}
+            {/* 👇 2. NOVA ROTA ADICIONADA SEGUINDO O SEU PADRÃO */}
             <Route path="/admin/users" element={<AdminUsers />} />
             
             <Route path="*" element={<NotFound />} />
