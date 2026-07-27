@@ -216,7 +216,7 @@ export default function Dashboard() {
               >
                 <div className="flex items-start justify-between mb-5">
                   <div className="min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary/80 mb-0.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1">
                       {tenant?.name || "Empresa Vinculada"}
                     </div>
                     <div className="font-semibold text-base leading-tight text-foreground truncate">{ch.name}</div>
