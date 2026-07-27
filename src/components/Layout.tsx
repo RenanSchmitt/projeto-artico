@@ -60,14 +60,15 @@ export default function Layout({ children }: { children: ReactNode }) {
 
             {/* Komprão / Grupo Koch badge */}
             <div className="hidden md:flex items-center gap-2 pl-4 ml-1 border-l border-border">
-              <div className="flex h-8 items-center gap-2 rounded-md bg-secondary px-3">
-                <span className="inline-block w-1.5 h-4 rounded-sm bg-primary" />
+              <div className="flex h-9 items-center gap-2.5 rounded-md border border-border bg-secondary/60 px-3">
+                <span className="flex h-5 w-5 items-center justify-center rounded-sm bg-primary text-[10px] font-bold text-primary-foreground">K</span>
                 <div className="leading-tight">
-                  <div className="text-[11px] font-bold tracking-tight text-foreground">Komprão Atacadista</div>
+                  <div className="text-[11px] font-semibold tracking-tight text-foreground">Komprão Atacadista</div>
                   <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Grupo Koch</div>
                 </div>
               </div>
             </div>
+
 
             {isAdmin && (
               <nav className="hidden lg:flex items-center gap-1 pl-4 ml-1 border-l border-border">
