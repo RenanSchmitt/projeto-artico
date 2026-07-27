@@ -35,7 +35,7 @@ export default function SystemDetail() {
     let cancelled = false;
 
     // Dispara a simulação uma vez ao carregar
-    supabase.functions.invoke("simulate-tick").catch(() => { });
+    // supabase.functions.invoke("simulate-tick").catch(() => { });
 
     // ⚡ MOTOR 1: Atualiza o bloco de Temperatura e Painel de Engenharia (a cada 10 segundos)
     async function fetchLatest() {

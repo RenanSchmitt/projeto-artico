@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
-import { Trash2, Shield, Building, Cpu, ArrowLeft, Copy, Check, Pencil, X } from "lucide-react";
+import { Trash2, Shield, Building, ArrowLeft, Copy, Check, Pencil, X } from "lucide-react";
 
 type Tenant = { id: string; name: string };
 type Chamber = { 
@@ -31,9 +30,6 @@ export default function AdminChamberManager() {
   // 🔄 Estado de controle: se tiver uma ID aqui, estamos editando. Se for null, estamos cadastrando.
   const [editingChamberId, setEditingChamberId] = useState<string | null>(null);
 
-  // Controle de Modo Virtual (Simulado) ou Real (Hardware)
-  const [isVirtualMode, setIsVirtualMode] = useState<boolean>(true);
-
   // Estados do formulário de cadastro / edição
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
@@ -44,7 +40,6 @@ export default function AdminChamberManager() {
 
   useEffect(() => {
     fetchData();
-    fetchSystemMode();
   }, []);
 
   async function fetchData() {
@@ -60,35 +55,6 @@ export default function AdminChamberManager() {
       console.error("Erro ao carregar dados do admin:", err);
     }
   }
-
-  async function fetchSystemMode() {
-    try {
-      const { data } = await supabase.from("system_settings").select("value").eq("key", "simulation_mode").maybeSingle();
-      if (data) {
-        setIsVirtualMode(data.value === "true");
-      }
-    } catch (err) {
-      console.log("Usando estado local para simulação.");
-    }
-  }
-
-  const handleToggleMode = async (checked: boolean) => {
-    setIsVirtualMode(checked);
-    try {
-      await supabase.from("system_settings").upsert({ key: "simulation_mode", value: String(checked) });
-      toast({
-        title: checked ? "Modo Virtual Ativo" : "Modo Real Ativo",
-        description: checked 
-          ? "O sistema agora está a gerar dados simulados automaticamente." 
-          : "O sistema agora está a aguardar leituras reais do hardware (ESP32).",
-      });
-    } catch (err) {
-      toast({
-        title: checked ? "Modo Virtual (Local)" : "Modo Real (Local)",
-        description: "Modo alterado na interface.",
-      });
-    }
-  };
 
   // 🛠️ Ativa o Modo de Edição no formulário jogando os dados da linha nos inputs
   const startEdit = (ch: Chamber) => {
@@ -242,37 +208,6 @@ export default function AdminChamberManager() {
         </Button>
       </div>
 
-      {/* CONTROLE GLOBAL: VIRTUAL VS REAL */}
-      <Card className="border-border bg-card overflow-hidden relative">
-        <div className={`absolute top-0 left-0 w-1.5 h-full ${isVirtualMode ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-        <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-lg ${isVirtualMode ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-              <Cpu className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="font-bold text-lg tracking-wide uppercase">Ambiente de Operação</h2>
-              <p className="text-xs text-muted-foreground">
-                Defina se o painel opera com telemetrias simuladas em nuvem ou via hardware físico.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 bg-muted/50 px-4 py-2.5 rounded-xl border border-border">
-            <span className={`text-xs font-bold uppercase tracking-wider ${!isVirtualMode ? 'text-emerald-500' : 'text-muted-foreground'}`}>
-              Hardware Real
-            </span>
-            <Switch 
-              checked={isVirtualMode} 
-              onCheckedChange={handleToggleMode}
-              className="data-[state=checked]:bg-amber-500"
-            />
-            <span className={`text-xs font-bold uppercase tracking-wider ${isVirtualMode ? 'text-amber-500' : 'text-muted-foreground'}`}>
-              Simulador Virtual
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* FORMULÁRIO DE CADASTRO / EDICAO DINÂMICO */}
       <Card className={`border-border bg-card transition-all ${editingChamberId ? 'ring-1 ring-amber-500/50 shadow-md shadow-amber-500/5' : ''}`}>
         <CardHeader>
@@ -294,9 +229,7 @@ export default function AdminChamberManager() {
               <label className="text-sm font-medium text-muted-foreground">Cliente / Empresa Destino</label>
               <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
                 <SelectTrigger className="w-full">
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente responsável" />
-                  </SelectTrigger>
+                  <SelectValue placeholder="Selecione o cliente responsável" />
                 </SelectTrigger>
                 <SelectContent>
                   {tenants.map((tenant) => (
@@ -406,7 +339,6 @@ export default function AdminChamberManager() {
                         </td>
                         <td className="p-4">
                           <div className="flex items-center justify-center gap-2">
-                            {/* ✏️ BOTÃO EDITAR INJETADO */}
                             <Button 
                               variant="outline" 
                               size="icon" 
