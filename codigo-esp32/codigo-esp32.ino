@@ -130,7 +130,7 @@ void checarEConectarWiFi() {
 }
 
 // =========================================================================
-// 🔄 BUSCA NOVOS SETPOINTS NO SUPABASE (COM PROTEÇÃO DE MEMÓRIA)
+// 🔄 BUSCA NOVOS SETPOINTS NO SUPABASE (SINTAXE ARDUINOJSON v7)
 // =========================================================================
 void buscarParametrosSupabase(Ilha &ilha) {
   if (WiFi.status() != WL_CONNECTED) return;
@@ -158,7 +158,8 @@ void buscarParametrosSupabase(Ilha &ilha) {
     if (httpCode == 200) {
       String payload = http.getString();
       
-      StaticJsonDocument<512> doc;
+      // Ajustado para ArduinoJson v7
+      JsonDocument doc;
       DeserializationError error = deserializeJson(doc, payload);
 
       if (!error && doc.is<JsonArray>() && doc.size() > 0) {
@@ -181,7 +182,7 @@ void buscarParametrosSupabase(Ilha &ilha) {
 }
 
 // =========================================================================
-// 📤 ENVIO DE TELEMETRIA PARA A NUVEM (TOTALMENTE PROTEGIDO)
+// 📤 ENVIO DE TELEMETRIA PARA A NUVEM (SINTAXE ARDUINOJSON v7)
 // =========================================================================
 bool enviarTelemetria(Ilha &ilha, int numero_ilha) {
   if (WiFi.status() != WL_CONNECTED) {
@@ -201,7 +202,8 @@ bool enviarTelemetria(Ilha &ilha, int numero_ilha) {
   HTTPClient http;
   String url = String(supabase_base_url) + "/telemetry";
 
-  StaticJsonDocument<384> doc;
+  // Ajustado para ArduinoJson v7
+  JsonDocument doc;
   doc["chamber_id"]           = ilha.chamber_id;
   doc["temperature"]          = serialized(String(ilha.tempAtualFreezer, 1));
   doc["suction_pressure"]     = 1.40;
