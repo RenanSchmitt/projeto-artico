@@ -8,27 +8,27 @@
 #include <esp_task_wdt.h>
 
 // =========================================================================
-// 📌 1. IDENTIFICAÇÃO DO EQUIPAMENTO (ALTERAR AO TROCAR DE ILHA/CÂMARA)
+// 📌 1. IDENTIFICAÇÃO DO EQUIPAMENTO
 // =========================================================================
-const char* CHAMBER_ID = "248613ed-9ae0-4592-8519-032b17f95f22"; 
+const char* CHAMBER_ID = "f7cfadb4-4788-4954-9bbd-034f3b34e240"; 
 
 // =========================================================================
 // 📌 2. CONFIGURAÇÕES DA REDE WI-FI LOCAL
 // =========================================================================
-const char* ssid     = "Koch - BYOD";  
-const char* password = "koch@30!20_"; 
+const char* ssid     = "Gesiele_2G";  
+const char* password = "Familiafarias#10";   
 
 // =========================================================================
-// 📌 3. CREDENCIAIS DO BANCO DE DADOS (SUPABASE)
+// 📌 3. CREDENCIAIS DO SUPABASE
 // =========================================================================
 const char* supabase_base_url = "https://vpmukocqdtljdxqndwts.supabase.co/rest/v1";
-const char* supabase_key      = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwbXVrb2NxZHRsamR4cW5kd3RzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NTM4NDgsImV4cCI6MjA5NTMyOTg0OH0.AEKSUKqtOVgyciUAlmXhN9nHcBtuRt1TykDQII_dtJ0"; 
+const char* supabase_key      = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwbXVrb2NxZHRsamR4cW5kd3RzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NTM4NDgsImV4cCI6MjA5NTMyOTg0OH0.AEKSUKqtOVgyciUAlmXhN9nHcBtuRt1TykDQII_dtJ0";
 
 // =========================================================================
-// 📌 4. PARAMETRIZAÇÃO TÉCNICA E CALIBRAÇÃO DE REFRIGERAÇÃO
+// 📌 4. PARAMETRIZAÇÃO TÉCNICA E CALIBRAÇÃO
 // =========================================================================
 const float OFFSET_FREEZER = -2.0; 
-const float HISTERESE_COMPRESSOR = 2.0; 
+const float HISTERESE_COMPRESSOR = 2.0; // Religa quando a temperatura subir 2.0°C acima do setpoint
 
 // =========================================================================
 // 📌 5. ESTRUTURA DE DADOS DA ILHA
@@ -38,39 +38,23 @@ struct Ilha {
   float setPoint;            
   float tempMin;             
   float tempMax;             
-  
-  int indexSensorFreezer;    
-  int indexSensorTuboDegelo; 
-  
   float tempAtualFreezer;    
-  float tempAtualTuboDegelo; 
-  
+  float tempAtualDegelo;     
   bool compressor_on;        
   bool defrost_on;           
 };
 
 Ilha ilhas[] = {
-  { 
-    CHAMBER_ID, 
-    -18.0,      
-    -22.0,      
-    -15.0,      
-    1,          
-    0,          
-    -18.0,      
-    20.0,       
-    true,       
-    false       
-  }
+  { CHAMBER_ID, -18.0, -22.0, -15.0, -18.0, 20.0, true, false }
 };
 
 const int totalIlhas = sizeof(ilhas) / sizeof(ilhas[0]);
 
 // =========================================================================
-// 📌 6. PINAGEM DO HARDWARE E TEMPORIZADORES
+// 📌 6. PINAGEM E TEMPORIZADORES
 // =========================================================================
 #define ONE_WIRE_BUS 13         
-#define WDT_TIMEOUT_SECONDS 15  
+#define WDT_TIMEOUT_SECONDS 30  
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -88,24 +72,25 @@ unsigned long ultimaChecagemWiFi = 0;
 const unsigned long intervaloChecagemWiFi = 15000; // 15 SEGUNDOS
 
 unsigned long ultimoEnvioSucesso = 0;
-const unsigned long TIMEOUT_REINICIO_SEM_COMUNICEACAO = 15 * 60 * 1000UL; // Reboot se ficar 15 MINUTOS sem enviar
+const unsigned long TIMEOUT_REINICIO_SEM_COMUNICEACAO = 15 * 60 * 1000UL; // 15 MINUTOS
+
+// Declaração antecipada
+void buscarParametrosSupabase(Ilha &ilha);
 
 // =========================================================================
-// 🔄 CONEXÃO E RECONEXÃO WI-FI 100% BLINDADA (PROTEÇÃO CONTRA ESTOURO DE RAM)
+// 🔄 CONEXÃO WI-FI SEGURA E NÃO-BLOQUEANTE
 // =========================================================================
 void checarEConectarWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
 
-  // Trava de segurança: Se a RAM estiver crítica, reinicia antes de gastar memória com o rádio
   if (ESP.getFreeHeap() < 40000) {
-    Serial.println("\n🚨 [ALERTA DE RAM] Memória baixa (<40KB) ao reconectar Wi-Fi! Reiniciando...");
+    Serial.println("\n🚨 [ALERTA DE RAM] Memória baixa (<40KB)! Reiniciando...");
     delay(500);
     ESP.restart();
   }
 
   Serial.println("\n⚠️ Wi-Fi desconectado! Tentando reconectar...");
   
-  // O parâmetro 'true' desliga o rádio antes de religar, limpando a memória RAM do módulo de RF
   WiFi.disconnect(true); 
   delay(100);
   
@@ -113,9 +98,9 @@ void checarEConectarWiFi() {
   WiFi.begin(ssid, password);
 
   int tentativas = 0;
-  while (WiFi.status() != WL_CONNECTED && tentativas < 15) {
+  while (WiFi.status() != WL_CONNECTED && tentativas < 10) {
     esp_task_wdt_reset(); 
-    delay(500);
+    delay(1000);
     Serial.print(".");
     tentativas++;
   }
@@ -125,21 +110,16 @@ void checarEConectarWiFi() {
     Serial.print("📍 IP: ");
     Serial.println(WiFi.localIP());
   } else {
-    Serial.println("\n❌ Falha na reconexão do Wi-Fi. Tentará novamente no próximo ciclo.");
+    Serial.println("\n❌ Falha temporária na reconexão do Wi-Fi.");
   }
 }
 
 // =========================================================================
-// 🔄 BUSCA NOVOS SETPOINTS NO SUPABASE (SINTAXE ARDUINOJSON v7)
+// 🔄 BUSCA PARÂMETROS NO SUPABASE
 // =========================================================================
 void buscarParametrosSupabase(Ilha &ilha) {
   if (WiFi.status() != WL_CONNECTED) return;
-
-  // TRAVA DE SEGURANÇA 1: Exige no mínimo 50KB livres para alocar SSL com folga
-  if (ESP.getFreeHeap() < 50000) {
-    Serial.println("⚠️ Memória RAM baixa (<50KB). Busca de parâmetros ignorada temporariamente.");
-    return;
-  }
+  if (ESP.getFreeHeap() < 50000) return;
 
   WiFiClientSecure client;
   client.setInsecure(); 
@@ -154,26 +134,13 @@ void buscarParametrosSupabase(Ilha &ilha) {
     http.addHeader("Authorization", ("Bearer " + String(supabase_key)).c_str());
 
     int httpCode = http.GET();
-
     if (httpCode == 200) {
-      String payload = http.getString();
-      
-      // Ajustado para ArduinoJson v7
       JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, payload);
-
-      if (!error && doc.is<JsonArray>() && doc.size() > 0) {
+      if (!deserializeJson(doc, http.getString()) && doc.is<JsonArray>() && doc.size() > 0) {
         JsonObject obj = doc[0];
-
-        if (obj.containsKey("setpoint") && !obj["setpoint"].isNull()) {
-          ilha.setPoint = obj["setpoint"].as<float>();
-        }
-        if (obj.containsKey("min_temp") && !obj["min_temp"].isNull()) {
-          ilha.tempMin = obj["min_temp"].as<float>();
-        }
-        if (obj.containsKey("max_temp") && !obj["max_temp"].isNull()) {
-          ilha.tempMax = obj["max_temp"].as<float>();
-        }
+        if (!obj["setpoint"].isNull()) ilha.setPoint = obj["setpoint"].as<float>();
+        if (!obj["min_temp"].isNull()) ilha.tempMin = obj["min_temp"].as<float>();
+        if (!obj["max_temp"].isNull()) ilha.tempMax = obj["max_temp"].as<float>();
       }
     }
     http.end();
@@ -182,7 +149,7 @@ void buscarParametrosSupabase(Ilha &ilha) {
 }
 
 // =========================================================================
-// 📤 ENVIO DE TELEMETRIA PARA A NUVEM (SINTAXE ARDUINOJSON v7)
+// 📤 ENVIO DE TELEMETRIA PURA COM DEGELO REAL
 // =========================================================================
 bool enviarTelemetria(Ilha &ilha, int numero_ilha) {
   if (WiFi.status() != WL_CONNECTED) {
@@ -190,9 +157,8 @@ bool enviarTelemetria(Ilha &ilha, int numero_ilha) {
     return false;
   }
 
-  // TRAVA DE SEGURANÇA 2: Exige no mínimo 50KB livres antes de abrir SSL
-  if (ESP.getFreeHeap() < 50000) {
-    Serial.println("  └─ ⚠️ Memória RAM insuficiente (<50KB) para abrir conexão SSL.");
+  if (ESP.getFreeHeap() < 30000) {
+    Serial.println("  └─ ⚠️ Memória RAM crítica (<30KB) para SSL.");
     return false;
   }
 
@@ -202,18 +168,17 @@ bool enviarTelemetria(Ilha &ilha, int numero_ilha) {
   HTTPClient http;
   String url = String(supabase_base_url) + "/telemetry";
 
-  // Ajustado para ArduinoJson v7
   JsonDocument doc;
   doc["chamber_id"]           = ilha.chamber_id;
-  doc["temperature"]          = serialized(String(ilha.tempAtualFreezer, 1));
+  doc["temperature"]          = ilha.tempAtualFreezer; 
+  doc["condensation_temp"]    = ilha.tempAtualDegelo; 
   doc["suction_pressure"]     = 1.40;
   doc["evaporation_pressure"] = 1.30;
   doc["superheat"]            = 7.20;
   doc["subcooling"]           = 4.50;
-  doc["condensation_temp"]    = 36.80;
   doc["eev_opening"]          = 42.50;
   doc["compressor_on"]        = ilha.compressor_on;
-  doc["defrost_on"]           = ilha.defrost_on;
+  doc["defrost_on"]           = ilha.defrost_on;     
 
   String jsonDados;
   serializeJson(doc, jsonDados);
@@ -227,17 +192,21 @@ bool enviarTelemetria(Ilha &ilha, int numero_ilha) {
     http.addHeader("Authorization", ("Bearer " + String(supabase_key)).c_str());
 
     int codigoResposta = http.POST(jsonDados);
+    Serial.printf("  └─ 🌐 Código HTTP Supabase: %d (Temp: %.1f°C | Degelo: %.1f°C)\n", codigoResposta, ilha.tempAtualFreezer, ilha.tempAtualDegelo);
 
     if (codigoResposta == 201 || codigoResposta == 200) {
-      Serial.printf("  └─ 🟢 [Ilha %d] Envio Ok! | Freezer: %.1f°C | SetPoint: %.1f°C | Tubo: %.1f°C | Comp: %s | Degelo: %s\n", 
-                    numero_ilha, ilha.tempAtualFreezer, ilha.setPoint, ilha.tempAtualTuboDegelo,
-                    ilha.compressor_on ? "LIGADO" : "DESLIGADO", 
-                    ilha.defrost_on ? "EM DEGELO" : "NORMAL");
+      Serial.printf("  └─ 🟢 [Ilha %d] Envio OK! | Freezer: %.1f°C | Degelo: %.1f°C | Defrost: %s | Comp: %s\n", 
+                    numero_ilha, ilha.tempAtualFreezer, ilha.tempAtualDegelo, 
+                    ilha.defrost_on ? "ATIVO" : "OFF",
+                    ilha.compressor_on ? "LIGADO" : "DESLIGADO");
       sucesso = true;
     } else {
-      Serial.printf("  └─ ❌ [Ilha %d] Erro no envio HTTP: %d\n", numero_ilha, codigoResposta);
+      String respostaErro = http.getString();
+      Serial.printf("  └─ ❌ Erro Supabase: %s\n", respostaErro.c_str());
     }
     http.end();
+  } else {
+    Serial.println("  └─ ❌ Falha ao iniciar conexão HTTP.");
   }
   
   client.stop(); 
@@ -245,15 +214,79 @@ bool enviarTelemetria(Ilha &ilha, int numero_ilha) {
 }
 
 // =========================================================================
-// 🚀 INICIALIZAÇÃO DO SISTEMA (SETUP)
+// 🔍 LEITURA DOS SENSORES (COM OS SENSORES INVERTIDOS)
+// =========================================================================
+void lerSensoresIdentificados() {
+  sensors.requestTemperatures(); 
+  int quantidadeSensores = sensors.getDeviceCount();
+
+  Serial.println("\n--------------------------------------------------");
+  Serial.printf("🔍 [SENSORES 1-WIRE] Total encontrados: %d\n", quantidadeSensores);
+
+  if (quantidadeSensores == 0) {
+    Serial.println("❌ Nenhum sensor encontrado! Verifique as conexões do pino 13.");
+    return;
+  }
+
+  // AGORA O ÍNDICE 0 É O DEGELO
+  if (quantidadeSensores > 0) {
+    float tempDegeloBruta = sensors.getTempCByIndex(0);
+    if (tempDegeloBruta != DEVICE_DISCONNECTED_C && tempDegeloBruta != 85.0) {
+      ilhas[0].tempAtualDegelo = tempDegeloBruta;
+      Serial.printf("  └─ 🔥 Sensor Degelo (Índice 0):  %.2f °C\n", tempDegeloBruta);
+    } else {
+      Serial.println("  └─ 🔥 Sensor Degelo (Índice 0):  ⚠️ ERRO DE LEITURA");
+    }
+  }
+
+  // AGORA O ÍNDICE 1 É O FREEZER
+  if (quantidadeSensores > 1) {
+    float tempFreezerBruta = sensors.getTempCByIndex(1);
+    if (tempFreezerBruta != DEVICE_DISCONNECTED_C && tempFreezerBruta != 85.0) {
+      ilhas[0].tempAtualFreezer = tempFreezerBruta + OFFSET_FREEZER;
+      Serial.printf("  └─ 🧊 Sensor Freezer (Índice 1): %.2f °C (Corrigido: %.2f °C)\n", tempFreezerBruta, ilhas[0].tempAtualFreezer);
+    } else {
+      Serial.println("  └─ 🧊 Sensor Freezer (Índice 1): ⚠️ ERRO DE LEITURA");
+    }
+  }
+
+  // 1. AVALIAÇÃO DO ESTADO DO DEGELO (Liga >= 35°C, Desliga <= 34°C)
+  if (ilhas[0].tempAtualDegelo >= 45.0) {
+    ilhas[0].defrost_on = true;
+  } else if (ilhas[0].tempAtualDegelo < 45.0) {
+    ilhas[0].defrost_on = false;
+  }
+
+  // 2. LÓGICA PURA DE HISTERESE DO COMPRESSOR
+  if (ilhas[0].tempAtualFreezer <= ilhas[0].setPoint) {
+    ilhas[0].compressor_on = false;
+  } else if (ilhas[0].tempAtualFreezer >= (ilhas[0].setPoint + HISTERESE_COMPRESSOR)) {
+    ilhas[0].compressor_on = true;
+  }
+
+  Serial.printf("  └─ 🎯 SetPoint: %.1f°C | Histerese: +%.1f°C\n", ilhas[0].setPoint, HISTERESE_COMPRESSOR);
+  Serial.printf("  └─ ⚙️ Estado Compressor: %s | ❄️ Degelo: %s\n", 
+                ilhas[0].compressor_on ? "LIGADO" : "DESLIGADO", 
+                ilhas[0].defrost_on ? "ATIVO" : "OFF");
+  Serial.println("--------------------------------------------------");
+}
+
+// =========================================================================
+// 🚀 SETUP
 // =========================================================================
 void setup() {
   Serial.begin(115200); 
   delay(1000);
 
-  Serial.println("\n--- FrioCtrl IoT: MONITORAMENTO 100% BLINDADO ---");
+  Serial.println("\n--- FrioCtrl IoT: INICIALIZANDO SISTEMA ---");
 
-  esp_task_wdt_init(WDT_TIMEOUT_SECONDS, true);
+  esp_task_wdt_deinit();
+  esp_task_wdt_config_t twdt_config = {
+    .timeout_ms = WDT_TIMEOUT_SECONDS * 1000,
+    .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
+    .trigger_panic = true
+  };
+  esp_task_wdt_init(&twdt_config);
   esp_task_wdt_add(NULL); 
 
   pinMode(ONE_WIRE_BUS, INPUT_PULLUP);
@@ -263,7 +296,24 @@ void setup() {
   sensors.setResolution(10); 
   sensors.setWaitForConversion(true); 
 
-  checarEConectarWiFi();
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  int tentativas = 0;
+  while (WiFi.status() != WL_CONNECTED && tentativas < 20) {
+    esp_task_wdt_reset();
+    delay(500);
+    Serial.print(".");
+    tentativas++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n🟢 Wi-Fi Conectado!");
+    Serial.print("📍 IP: ");
+    Serial.println(WiFi.localIP());
+    
+    // Puxa o setpoint da base imediatamente ao ligar
+    buscarParametrosSupabase(ilhas[0]);
+  }
 
   unsigned long agora = millis();
   ultimoEnvio = agora;
@@ -274,75 +324,46 @@ void setup() {
 }
 
 // =========================================================================
-// 🔄 LOOP PRINCIPAL (EXECUÇÃO ROBUSTA 24/7)
+// 🔄 LOOP PRINCIPAL
 // =========================================================================
 void loop() {
-  // 🛡️ REBOOT PREVENTIVO SE A RAM CAIR DEMAIS (EVITA CRASH/PANIC)
   if (ESP.getFreeHeap() < 40000) {
-    Serial.println("\n🚨 [ALERTA DE MEMÓRIA] RAM crítica (<40KB)! Reiniciando sistema para evitar congelamento...");
+    Serial.println("\n🚨 [ALERTA] RAM crítica! Reiniciando...");
     delay(500);
     ESP.restart();
   }
 
-  // Alimenta o Watchdog de Hardware
   esp_task_wdt_reset();
 
   unsigned long agora = millis();
 
-  // 1. CHECAGEM PREVENTIVA DO WI-FI (A CADA 15 SEGUNDOS)
+  // 1. CHECAGEM PREVENTIVA DO WI-FI
   if (agora - ultimaChecagemWiFi >= intervaloChecagemWiFi) {
     ultimaChecagemWiFi = agora;
     checarEConectarWiFi();
   }
 
-  // 2. BUSCA DE NOVOS PARÂMETROS NO SUPABASE (A CADA 5 MINUTOS)
+  esp_task_wdt_reset(); 
+
+  // 2. BUSCA DE PARÂMETROS
   if (agora - ultimaBuscaParametros >= intervaloParametros) {
     if (WiFi.status() == WL_CONNECTED) {
       ultimaBuscaParametros = agora;
-      Serial.println("\n🔄 [SYNC] Sincronizando parâmetros com o Supabase...");
       for (int i = 0; i < totalIlhas; i++) {
         buscarParametrosSupabase(ilhas[i]);
       }
     }
   }
 
-  // 3. LEITURA E FILTRAGEM DOS SENSORES (A CADA 15 SEGUNDOS)
+  // 3. LEITURA DOS SENSORES (A CADA 15 SEGUNDOS)
   if (agora - ultimaLeituraSensores >= intervaloSensores) {
     ultimaLeituraSensores = agora;
-    sensors.requestTemperatures(); 
-
-    for (int i = 0; i < totalIlhas; i++) {
-      float rawFreezer = sensors.getTempCByIndex(ilhas[i].indexSensorFreezer);
-      float rawTubo    = sensors.getTempCByIndex(ilhas[i].indexSensorTuboDegelo);
-
-      if (rawFreezer != DEVICE_DISCONNECTED_C && rawFreezer != 85.0) {
-        ilhas[i].tempAtualFreezer = rawFreezer + OFFSET_FREEZER;
-      } else {
-        Serial.println("⚠️ [Ruído] Leitura incorreta no Freezer ignorada.");
-      }
-
-      if (rawTubo != DEVICE_DISCONNECTED_C && rawTubo != 85.0) {
-        ilhas[i].tempAtualTuboDegelo = rawTubo;
-      } else {
-        Serial.println("⚠️ [Ruído] Leitura incorreta no Tubo ignorada.");
-      }
-
-      ilhas[i].defrost_on = (ilhas[i].tempAtualTuboDegelo > 33.0 && ilhas[i].tempAtualTuboDegelo <= 80.0);
-
-      if (ilhas[i].tempAtualFreezer <= ilhas[i].setPoint) {
-        ilhas[i].compressor_on = false;
-      } 
-      else if (ilhas[i].tempAtualFreezer >= (ilhas[i].setPoint + HISTERESE_COMPRESSOR)) {
-        ilhas[i].compressor_on = true;
-      }
-    }
+    lerSensoresIdentificados();
   }
 
-  // 4. ENVIO DA TELEMETRIA PARA A NUVEM (A CADA 1 MINUTO)
+  // 4. ENVIO DE TELEMETRIA (A CADA 1 MINUTO)
   if (agora - ultimoEnvio >= intervaloEnvio) {
     ultimoEnvio = agora;
-
-    Serial.println("\n--------------------------------------------------");
     bool peloMenosUmEnviado = false;
 
     if (WiFi.status() == WL_CONNECTED) {
@@ -351,21 +372,19 @@ void loop() {
           peloMenosUmEnviado = true;
         }
       }
-    } else {
-      Serial.println("⚠️ Sem Wi-Fi. Tentativa de envio ignorada.");
     }
 
     if (peloMenosUmEnviado) {
       ultimoEnvioSucesso = agora;
     }
-    Serial.println("--------------------------------------------------");
   }
 
-  // 5. WATCHDOG DE COMUNICAÇÃO (15 MINUTOS SEM SUCESSO = REBOOT)
+  // 5. WATCHDOG DE COMUNICAÇÃO (15 MINUTOS)
   if (agora - ultimoEnvioSucesso >= TIMEOUT_REINICIO_SEM_COMUNICEACAO) {
-    Serial.println("\n🚨 [ALERTA CRÍTICO] Placa sem comunicação há mais de 15 minutos!");
-    Serial.println("🔄 Executando reinício preventivo (ESP.restart)...");
+    Serial.println("\n🚨 [ALERTA] Sem comunicação há 15 min. Reiniciando...");
     delay(1000);
     ESP.restart(); 
   }
+  
+  delay(20);
 }
