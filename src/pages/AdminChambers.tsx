@@ -105,7 +105,7 @@ export default function AdminChamberManager() {
     try {
       if (editingChamberId) {
         // Modo Edição: Faz UPDATE no banco
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("chambers")
           .update({
             name: name,
@@ -115,9 +115,14 @@ export default function AdminChamberManager() {
             min_temp: Number(minTemp),
             max_temp: Number(maxTemp),
           })
-          .eq("id", editingChamberId);
+          .eq("id", editingChamberId)
+          .select("id")
+          .maybeSingle();
 
         if (error) throw error;
+        if (!data) {
+          throw new Error("A câmara não foi atualizada. Confirme se esta conta possui permissão de administrador.");
+        }
 
         toast({
           title: "Parâmetros Atualizados!",
@@ -163,8 +168,16 @@ export default function AdminChamberManager() {
       return;
     }
     try {
-      const { error } = await supabase.from("chambers").delete().eq("id", id);
+      const { data, error } = await supabase
+        .from("chambers")
+        .delete()
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      if (!data) {
+        throw new Error("A câmara não foi excluída. Confirme se esta conta possui permissão de administrador.");
+      }
       toast({
         title: "Câmara removida",
         description: `A câmara "${chamberName}" foi excluída com sucesso.`,
