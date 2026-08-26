@@ -1,117 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Industrial Dark Mode design system */
-
 @layer base {
   :root {
-    --background: 0 0% 5%;
-    --foreground: 0 0% 98%;
-
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 0 0% 8%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 142 100% 50%;
-    --primary-foreground: 0 0% 5%;
-
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 60%;
-
-    --accent: 0 0% 14%;
-    --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 100% 55%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 0 0% 16%;
-    --input: 0 0% 14%;
-    --ring: 142 100% 50%;
-
-    --radius: 0.5rem;
-
-    /* Status semantic */
-    --status-ok: 142 100% 50%;        /* Verde Neon */
-    --status-alert: 0 100% 55%;       /* Vermelho */
-    --status-warn: 38 100% 55%;       /* Âmbar */
-    --status-offline: 0 0% 40%;       /* Cinza */
-
-    /* Glow shadows */
-    --glow-ok: 0 0 20px hsla(293, 91%, 13%, 0.5);
-    --glow-alert: 0 0 24px hsl(0 100% 55% / 0.6);
-
-    /* Sidebar (unused but keep tokens) */
-    --sidebar-background: 0 0% 7%;
-    --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 142 100% 50%;
-    --sidebar-primary-foreground: 0 0% 5%;
-    --sidebar-accent: 0 0% 12%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 0 0% 16%;
-    --sidebar-ring: 142 100% 50%;
+    --background:160 15% 5%;--foreground:150 20% 96%;--card:158 14% 8%;--card-foreground:150 20% 96%;--popover:158 14% 8%;--popover-foreground:150 20% 96%;--primary:150 100% 45%;--primary-foreground:160 20% 4%;--secondary:158 13% 12%;--secondary-foreground:150 20% 96%;--muted:158 11% 13%;--muted-foreground:154 8% 61%;--accent:154 15% 14%;--accent-foreground:150 20% 96%;--destructive:359 100% 65%;--destructive-foreground:0 0% 100%;--border:156 13% 17%;--input:156 13% 18%;--ring:150 100% 45%;--radius:.75rem;
+    --status-ok:150 100% 45%;--status-alert:359 100% 65%;--status-warn:42 90% 61%;--status-info:212 100% 65%;--status-offline:155 5% 45%;
+    --sidebar-background:160 17% 6%;--sidebar-foreground:150 15% 90%;--sidebar-primary:150 100% 45%;--sidebar-primary-foreground:160 20% 4%;--sidebar-accent:158 14% 11%;--sidebar-accent-foreground:150 20% 95%;--sidebar-border:156 13% 15%;--sidebar-ring:150 100% 45%;
   }
-
-  .dark {
-    --background: 0 0% 5%;
-    --foreground: 0 0% 98%;
-  }
+  *{@apply border-border} html{color-scheme:dark} body{@apply bg-background text-foreground antialiased;min-width:320px;font-family:Inter,ui-sans-serif,system-ui,sans-serif;background-image:radial-gradient(ellipse at 50% -10%,hsl(var(--primary)/.045),transparent 45%),linear-gradient(hsl(0 0% 100%/.012) 1px,transparent 1px),linear-gradient(90deg,hsl(0 0% 100%/.012) 1px,transparent 1px);background-size:auto,44px 44px,44px 44px} ::selection{background:hsl(var(--primary)/.25);color:hsl(var(--foreground))}
 }
-
-@layer base {
-  * { @apply border-border; }
-  html { @apply dark; }
-  body {
-    @apply bg-background text-foreground;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    background-image:
-      radial-gradient(ellipse at top, hsl(142 100% 50% / 0.04), transparent 50%),
-      linear-gradient(hsl(0 0% 100% / 0.015) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(0 0% 100% / 0.015) 1px, transparent 1px);
-    background-size: auto, 32px 32px, 32px 32px;
-  }
+@layer components{.surface{@apply rounded-xl border border-border bg-card}.eyebrow{@apply text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground}.sensor-value{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}}
+@layer utilities{
+  .text-status-ok{color:hsl(var(--status-ok))}.text-status-alert{color:hsl(var(--status-alert))}.text-status-warn{color:hsl(var(--status-warn))}.text-status-info{color:hsl(var(--status-info))}.text-status-offline{color:hsl(var(--status-offline))}
+  .bg-status-ok{background-color:hsl(var(--status-ok))}.bg-status-alert{background-color:hsl(var(--status-alert))}.bg-status-warn{background-color:hsl(var(--status-warn))}.bg-status-info{background-color:hsl(var(--status-info))}.bg-status-offline{background-color:hsl(var(--status-offline))}
+  .border-status-ok{border-color:hsl(var(--status-ok)/.45)}.border-status-alert{border-color:hsl(var(--status-alert)/.5)}.glow-ok{box-shadow:0 0 0 1px hsl(var(--status-ok)/.08),0 16px 48px hsl(150 80% 2%/.22)}.glow-alert{box-shadow:0 0 0 1px hsl(var(--status-alert)/.12),0 16px 48px hsl(359 80% 4%/.2)}.pulse-alert{animation:pulse-alert 1.8s ease-in-out infinite}.pulse-ok{animation:pulse-ok 2.8s ease-in-out infinite}
 }
-
-@layer utilities {
-  .text-status-ok { color: hsl(var(--status-ok)); }
-  .text-status-alert { color: hsl(var(--status-alert)); }
-  .text-status-warn { color: hsl(var(--status-warn)); }
-  .text-status-offline { color: hsl(var(--status-offline)); }
-  .bg-status-ok { background-color: hsl(var(--status-ok)); }
-  .bg-status-alert { background-color: hsl(var(--status-alert)); }
-  .bg-status-warn { background-color: hsl(var(--status-warn)); }
-  .bg-status-offline { background-color: hsl(var(--status-offline)); }
-  .border-status-ok { border-color: hsl(var(--status-ok)); }
-  .border-status-alert { border-color: hsl(var(--status-alert)); }
-
-  .glow-ok { box-shadow: var(--glow-ok); }
-  .glow-alert { box-shadow: var(--glow-alert); }
-
-  .pulse-alert {
-    animation: pulse-alert 1.2s ease-in-out infinite;
-  }
-  .pulse-ok {
-    animation: pulse-ok 2.5s ease-in-out infinite;
-  }
-}
-
-@keyframes pulse-alert {
-  0%, 100% {
-    box-shadow: 0 0 0 0 hsl(0 100% 55% / 0.7), 0 0 20px hsl(0 100% 55% / 0.4);
-    background-color: hsl(0 100% 55%);
-  }
-  50% {
-    box-shadow: 0 0 0 12px hsl(0 100% 55% / 0), 0 0 30px hsl(0 100% 55% / 0.8);
-    background-color: hsl(0 100% 65%);
-  }
-}
-
-@keyframes pulse-ok {
-  0%, 100% { box-shadow: 0 0 8px hsl(142 100% 50% / 0.5); }
-  50% { box-shadow: 0 0 16px hsl(142 100% 50% / 0.9); }
-}
+@keyframes pulse-alert{0%,100%{box-shadow:0 0 0 0 hsl(var(--status-alert)/.4)}50%{box-shadow:0 0 0 7px hsl(var(--status-alert)/0)}}
+@keyframes pulse-ok{0%,100%{box-shadow:0 0 6px hsl(var(--status-ok)/.35)}50%{box-shadow:0 0 13px hsl(var(--status-ok)/.65)}}

@@ -151,7 +151,10 @@ export default function SystemDetail() {
   }
 
   return (
-    <Layout>
+    <Layout
+      title={chamber?.name ?? "Detalhes da câmara"}
+      subtitle={tenantName ? `${tenantName} · telemetria e engenharia` : "Telemetria e engenharia"}
+    >
       <div className="space-y-6">
         <Button variant="ghost" onClick={() => nav("/")} className="-ml-3">
           <ArrowLeft className="w-4 h-4 mr-2" /> Voltar ao painel

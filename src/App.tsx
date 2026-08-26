@@ -8,6 +8,7 @@ import AdminChambers from "./pages/AdminChambers";
 import SystemDetail from "./pages/SystemDetail";
 import Auth from "./pages/Auth";
 import Bancada from "./pages/Bancada";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound.tsx";
 
 // 👇 1. IMPORTA A TELA DE USUÁRIOS
@@ -59,6 +60,7 @@ const App = () => {
             <Route path="/auth" element={<Auth />} />
             <Route path="/system/:id" element={<SystemDetail />} />
             <Route path="/bancada" element={<Bancada />} />
+            <Route path="/reports" element={<Reports />} />
             <Route path="/admin" element={<AdminChambers />} />
             
             {/* 👇 2. ROTA ADICIONADA SEGUINDO O SEU PADRÃO */}

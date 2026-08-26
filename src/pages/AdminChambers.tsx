@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { Trash2, Shield, Building, ArrowLeft, Copy, Check, Pencil, X } from "lucide-react";
+import { Trash2, Shield, Building, Copy, Check, Pencil, X, Plus, Server } from "lucide-react";
 
 type Tenant = { id: string; name: string };
 type Chamber = { 
@@ -21,7 +21,6 @@ type Chamber = {
 
 export default function AdminChamberManager() {
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [chambers, setChambers] = useState<Chamber[]>([]);
   const [loading, setLoading] = useState(false);
@@ -193,28 +192,21 @@ export default function AdminChamberManager() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-4 space-y-6">
-      
-      {/* BOTÃO VOLTAR */}
-      <div className="flex items-center justify-start">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => navigate("/")}
-          className="gap-2 font-semibold"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Voltar ao Painel
-        </Button>
+    <Layout title="Câmaras" subtitle="Cadastro, configuração e vínculo dos dispositivos">
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card className="flex items-center gap-4 p-5"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Building className="h-5 w-5"/></span><div><div className="sensor-value text-2xl font-bold">{chambers.length}</div><div className="text-sm font-semibold">Câmaras cadastradas</div></div></Card>
+        <Card className="flex items-center gap-4 p-5"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10 text-status-info"><Server className="h-5 w-5"/></span><div><div className="sensor-value text-2xl font-bold">{tenants.length}</div><div className="text-sm font-semibold">Clientes vinculáveis</div></div></Card>
+        <Card className="flex items-center gap-4 p-5"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-status-ok"><Shield className="h-5 w-5"/></span><div><div className="text-sm font-semibold">Configuração protegida</div><div className="text-xs text-muted-foreground">Parâmetros validados antes de salvar</div></div></Card>
       </div>
 
       {/* FORMULÁRIO DE CADASTRO / EDICAO DINÂMICO */}
-      <Card className={`border-border bg-card transition-all ${editingChamberId ? 'ring-1 ring-amber-500/50 shadow-md shadow-amber-500/5' : ''}`}>
+      <Card className={`overflow-hidden border-border bg-card transition-all ${editingChamberId ? 'ring-1 ring-yellow-500/50' : ''}`}>
         <CardHeader>
-          <CardTitle className="text-xl font-bold tracking-wide flex items-center justify-between">
+          <CardTitle className="flex flex-col gap-3 text-lg font-bold sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <Shield className={`w-5 h-5 ${editingChamberId ? "text-amber-500" : "text-primary"}`} /> 
-              {editingChamberId ? "EDITAR CONFIGURAÇÕES DA CÂMARA" : "CADASTRAR NOVA CÂMARA"}
+              {editingChamberId ? "Editar configurações da câmara" : "Cadastrar nova câmara"}
             </div>
             {editingChamberId && (
               <Button type="button" variant="ghost" size="sm" onClick={cancelEdit} className="text-muted-foreground hover:text-foreground h-8 px-2">
@@ -252,7 +244,7 @@ export default function AdminChamberManager() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">Setpoint (°C)</label>
                 <Input type="number" step="0.1" value={setpoint} onChange={(e) => setSetpoint(e.target.value)} />
@@ -273,7 +265,8 @@ export default function AdminChamberManager() {
                   Cancelar
                 </Button>
               )}
-              <Button type="submit" className={`flex-1 ${editingChamberId ? "bg-amber-600 hover:bg-amber-500 text-white" : ""}`} disabled={loading}>
+              <Button type="submit" className="flex-1 gap-2" disabled={loading}>
+                {!loading && (editingChamberId ? <Check className="h-4 w-4"/> : <Plus className="h-4 w-4"/>)}
                 {loading ? "Processando..." : editingChamberId ? "Salvar Parâmetros da Câmara" : "Salvar e Vincular Câmara"}
               </Button>
             </div>
@@ -284,14 +277,14 @@ export default function AdminChamberManager() {
       {/* TABELA DE GERENCIAMENTO */}
       <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle className="text-xl font-bold tracking-wide flex items-center gap-2">
-            <Building className="w-5 h-5 text-primary" /> GERENCIAR CÂMARAS ATIVAS ({chambers.length})
+          <CardTitle className="flex items-center gap-2 text-lg font-bold">
+            <Building className="w-5 h-5 text-primary" /> Câmaras ativas <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{chambers.length}</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto rounded-md border border-border">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs uppercase bg-muted text-muted-foreground font-bold border-b border-border">
+              <thead className="border-b border-border bg-muted/50 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">
                 <tr>
                   <th className="p-4">Cliente Vinculado</th>
                   <th className="p-4">Nome da Câmara</th>
@@ -363,5 +356,6 @@ export default function AdminChamberManager() {
         </CardContent>
       </Card>
     </div>
+    </Layout>
   );
 }

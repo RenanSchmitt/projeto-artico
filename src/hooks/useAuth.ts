@@ -25,21 +25,32 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
+    // Nunca reutiliza papel ou tenant da sessão anterior.
+    setRole(null);
+    setTenantId(null);
+
     if (!user) {
-      setRole(null);
-      setTenantId(null);
       return;
     }
+
+    let cancelled = false;
     (async () => {
       const [{ data: roles }, { data: profile }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", user.id),
         supabase.from("profiles").select("tenant_id").eq("id", user.id).maybeSingle(),
       ]);
-      const isAdmin = roles?.some((r) => r.role === "admin");
+      if (cancelled) return;
+      // Uma conta vinculada a uma empresa sempre opera como cliente.
+      // Somente administradores sem tenant têm acesso global.
+      const isAdmin = roles?.some((r) => r.role === "admin") && !profile?.tenant_id;
       setRole(isAdmin ? "admin" : "client");
       setTenantId(profile?.tenant_id ?? null);
     })();
-  }, [user]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   return { session, user, role, tenantId, loading };
 }
