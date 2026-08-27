@@ -6,7 +6,7 @@ import HeartbeatBanner from "@/components/HeartbeatBanner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Thermometer, Snowflake, DoorOpen, DoorClosed, Power, AlertCircle, Gauge, Activity, Settings2 } from "lucide-react";
+import { ArrowLeft, Thermometer, Snowflake, DoorOpen, DoorClosed, Power, AlertCircle, Gauge, Activity, Settings2, ChevronDown } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 type Chamber = { id: string; name: string; location: string | null; setpoint: number; min_temp: number; max_temp: number; tenant_id: string };
@@ -293,6 +293,7 @@ const fmtP = (barVal: number | null, unit: PressureUnit) => {
 function EngineeringPanel({
   latest, unit, setUnit,
 }: { latest: Reading | null; unit: PressureUnit; setUnit: (u: PressureUnit) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
   const sh = latest?.superheat ?? null;
   const sc = latest?.subcooling ?? null;
   const shStatus = sh === null ? "off" : sh >= 5 && sh <= 10 ? "ok" : "alert";
@@ -302,17 +303,28 @@ function EngineeringPanel({
 
   return (
     <Card className="p-5 font-mono">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Settings2 className="text-status-ok" />
-          <div>
+      <div className={`flex items-center justify-between gap-4 ${isOpen ? "mb-4" : ""}`}>
+        <button
+          type="button"
+          onClick={() => setIsOpen((open) => !open)}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-expanded={isOpen}
+          aria-controls="engineering-panel-content"
+        >
+          <Settings2 className="shrink-0 text-status-ok" />
+          <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">PLC · Refrigeration Telemetry</div>
             <h2 className="text-lg font-bold tracking-wide">Painel de Engenharia</h2>
           </div>
-        </div>
-        <div className="flex items-center gap-1 text-[10px] border border-border rounded-md p-0.5">
+          <span className="mr-1 hidden text-[10px] uppercase tracking-widest text-muted-foreground sm:inline">
+            {isOpen ? "Fechar" : "Abrir"}
+          </span>
+          <ChevronDown className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        </button>
+        {isOpen && <div className="flex shrink-0 items-center gap-1 text-[10px] border border-border rounded-md p-0.5">
           {(["BAR", "PSI"] as PressureUnit[]).map((u) => (
             <button
+              type="button"
               key={u}
               onClick={() => setUnit(u)}
               className={`px-2.5 py-1 rounded-sm uppercase tracking-widest transition ${unit === u ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
@@ -321,9 +333,10 @@ function EngineeringPanel({
               {u}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
 
+      {isOpen && <div id="engineering-panel-content">
       <div className="grid gap-3 sm:grid-cols-2 mb-4">
         <PlcGauge
           label="Pressão de Sucção"
@@ -388,6 +401,7 @@ function EngineeringPanel({
           <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
         </div>
       </div>
+      </div>}
     </Card>
   );
 }
