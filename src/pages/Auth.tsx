@@ -10,8 +10,8 @@ import { Snowflake } from "lucide-react";
 
 export default function Auth() {
   const nav = useNavigate();
-  const [email, setEmail] = useState("admin@admin.com");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
 
@@ -49,7 +49,7 @@ export default function Auth() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-wide">FRIO<span className="text-primary">CTRL</span></h1>
-            <p className="text-xs text-muted-foreground uppercase tracking-widest">Industrial monitoring</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-widest">Monitoramento remoto</p>
           </div>
         </div>
 
@@ -67,12 +67,13 @@ export default function Auth() {
           </Button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-border text-xs text-muted-foreground space-y-1">
+        {/* <div className="mt-6 pt-6 border-t border-border text-xs text-muted-foreground space-y-1">
           <div className="uppercase tracking-widest text-[10px] mb-2">Contas de teste</div>
           <div>admin@admin.com / admin123 <span className="text-primary">(admin)</span></div>
           <div>mercado1@teste.com / admin123 <span className="text-primary">(cliente)</span></div>
           <div>mercado2@teste.com / admin123 <span className="text-primary">(cliente)</span></div>
-        </div>
+        </div> */}
+        <br/><br/><br/>
       </Card>
     </div>
   );
