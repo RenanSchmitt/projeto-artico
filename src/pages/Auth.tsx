@@ -67,13 +67,15 @@ export default function Auth() {
           </Button>
         </form>
 
-        {/* <div className="mt-6 pt-6 border-t border-border text-xs text-muted-foreground space-y-1">
-          <div className="uppercase tracking-widest text-[10px] mb-2">Contas de teste</div>
-          <div>admin@admin.com / admin123 <span className="text-primary">(admin)</span></div>
-          <div>mercado1@teste.com / admin123 <span className="text-primary">(cliente)</span></div>
-          <div>mercado2@teste.com / admin123 <span className="text-primary">(cliente)</span></div>
-        </div> */}
-        <br/><br/><br/>
+        <div className="mt-6 border-t border-border pt-6 text-center text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">
+            Acesso exclusivo para clientes cadastrados
+          </p>
+          <p className="mt-1">
+            Em caso de dificuldade para acessar, entre em contato com o suporte.
+          </p>
+        </div>
+        <br /><br /><br />
       </Card>
     </div>
   );
