@@ -75,7 +75,6 @@ export default function Auth() {
             Em caso de dificuldade para acessar, entre em contato com o suporte.
           </p>
         </div>
-        <br /><br /><br />
       </Card>
     </div>
   );
