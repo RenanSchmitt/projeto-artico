@@ -5,7 +5,7 @@ import Layout from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
-import { AlertTriangle, ArrowRight, CheckCircle2, DoorClosed, DoorOpen, Power, Snowflake, Thermometer, WifiOff } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronUp, DoorClosed, DoorOpen, Power, Snowflake, Thermometer, WifiOff, MapPin } from "lucide-react";
 
 type Chamber = { id:string;name:string;location:string|null;setpoint:number;min_temp:number;max_temp:number;tenant_id:string };
 type Tenant = { id:string;name:string;city:string|null };
@@ -30,6 +30,9 @@ export default function Dashboard(){
   const {user,role:authRole,loading}=useAuth(); const nav=useNavigate();
   const [tenants,setTenants]=useState<Tenant[]>([]),[chambers,setChambers]=useState<Chamber[]>([]);
   const [latest,setLatest]=useState<Record<string,Reading>>({}); const [filter,setFilter]=useState("all"); const [search,setSearch]=useState(""); const [isAdmin,setIsAdmin]=useState(false);
+  
+  // Estado para controlar quais localizações estão expandidas (todas abertas por padrão)
+  const [expandedLocations, setExpandedLocations]=useState<Record<string, boolean>>({});
 
   useEffect(()=>{ if(loading||!user)return; let cancelled=false;
     async function fetchData(){try{
@@ -39,6 +42,14 @@ export default function Dashboard(){
       let tq=supabase.from("tenants").select("*").order("name"),cq=supabase.from("chambers").select("*").order("name");
       if(!admin){const id=tenantId||"bloqueado-sem-tenant";tq=tq.eq("id",id);cq=cq.eq("tenant_id",id)}
       const [{data:ts},{data:chs}]=await Promise.all([tq,cq]);if(cancelled)return;setTenants(ts??[]);setChambers(chs??[]);
+      
+      // Inicializa todas as localizações como expandidas
+      if(chs){
+        const locs: Record<string, boolean> = {};
+        chs.forEach(c => { const loc = c.location || "Outros / Sem Localização"; locs[loc] = true; });
+        setExpandedLocations(locs);
+      }
+
       if(chs?.length){const ids=chs.map(c=>c.id);const {data:tel}=await supabase.from("telemetry").select("chamber_id, temperature, compressor_on, defrost_on, door_open, recorded_at").in("chamber_id",ids).order("recorded_at",{ascending:false});
         if(tel){const map:Record<string,Reading>={};for(const row of tel as Reading[])if(!map[row.chamber_id])map[row.chamber_id]=row;setLatest(map)}}
     }catch(error){console.error("Erro no painel:",error)}} fetchData();const timer=setInterval(fetchData,10000);return()=>{cancelled=true;clearInterval(timer)};
@@ -56,7 +67,24 @@ export default function Dashboard(){
     }
     return result;
   },[chambers,tenants,filter,isAdmin,search]);
+
+  // Agrupa as câmaras visíveis por localização
+  const groupedByLocation = useMemo(() => {
+    const map: Record<string, Chamber[]> = {};
+    visible.forEach(chamber => {
+      const loc = chamber.location || "Outros / Sem Localização";
+      if (!map[loc]) map[loc] = [];
+      map[loc].push(chamber);
+    });
+    return map;
+  }, [visible]);
+
   const totals=useMemo(()=>visible.reduce((acc,c)=>{acc[getStatus(c,latest[c.id])]++;return acc},{normal:0,warning:0,critical:0,offline:0}),[visible,latest]);
+  
+  const toggleLocation = (loc: string) => {
+    setExpandedLocations(prev => ({ ...prev, [loc]: !prev[loc] }));
+  };
+
   if(loading)return null;if(!user)return <Navigate to="/auth" replace/>;
 
   return <Layout title="Visão geral" subtitle="Monitoramento em tempo real das câmaras frigoríficas" searchValue={search} onSearchChange={setSearch}>
@@ -76,7 +104,51 @@ export default function Dashboard(){
       {totals.critical>0&&<button onClick={()=>{const c=visible.find(x=>getStatus(x,latest[x.id])==="critical");if(c)nav(`/system/${c.id}`)}} className="flex w-full items-center gap-4 rounded-xl border border-status-alert/30 bg-status-alert/10 p-4 text-left transition hover:bg-status-alert/15"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-alert/15 text-status-alert"><AlertTriangle className="h-5 w-5"/></span><div className="min-w-0 flex-1"><p className="font-semibold"><span className="text-status-alert">{totals.critical} {totals.critical===1?"alarme crítico ativo":"alarmes críticos ativos"}</span></p><p className="truncate text-sm text-muted-foreground">Temperatura fora da faixa configurada. Verifique a ocorrência.</p></div><span className="hidden items-center gap-2 text-sm font-semibold sm:flex">Ver ocorrência <ArrowRight className="h-4 w-4"/></span></button>}
 
       {visible.length===0?<Card className="p-12 text-center"><Snowflake className="mx-auto mb-4 h-10 w-10 text-muted-foreground"/><h3 className="font-semibold">Nenhuma câmara encontrada</h3><p className="mt-1 text-sm text-muted-foreground">Cadastre ou selecione outra empresa para começar.</p></Card>:
-      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{visible.map(ch=><ChamberCard key={ch.id} chamber={ch} reading={latest[ch.id]} tenant={tenants.find(t=>t.id===ch.tenant_id)} onClick={()=>nav(`/system/${ch.id}`)}/>)}</div>}
+      
+      // Listagem agrupada por localização com acordeão
+      <div className="space-y-4">
+        {Object.entries(groupedByLocation).map(([locationName, locChambers]) => {
+          const isExpanded = expandedLocations[locationName] ?? true;
+          return (
+            <Card key={locationName} className="overflow-hidden border border-border/60 bg-card/40">
+              {/* Cabeçalho do Grupo (Localização) clicável para recolher/expandir */}
+              <button 
+                onClick={() => toggleLocation(locationName)}
+                className="flex w-full items-center justify-between p-4 transition hover:bg-muted/30"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <MapPin className="h-5 w-5" />
+                  </span>
+                  <div className="text-left">
+                    <h3 className="text-base font-bold">{locationName}</h3>
+                    <p className="text-xs text-muted-foreground">{locChambers.length} {locChambers.length === 1 ? 'equipamento vinculado' : 'equipamentos vinculados'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <span className="text-xs font-semibold">{isExpanded ? "Recolher" : "Expandir"}</span>
+                  {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </div>
+              </button>
+
+              {/* Grid de Cards dos Freezers daquela localização */}
+              {isExpanded && (
+                <div className="grid gap-4 p-4 pt-0 md:grid-cols-2 2xl:grid-cols-3">
+                  {locChambers.map(ch => (
+                    <ChamberCard 
+                      key={ch.id} 
+                      chamber={ch} 
+                      reading={latest[ch.id]} 
+                      tenant={tenants.find(t => t.id === ch.tenant_id)} 
+                      onClick={() => nav(`/system/${ch.id}`)}
+                    />
+                  ))}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>}
     </div>
   </Layout>;
 }
@@ -89,4 +161,5 @@ function ChamberCard({chamber,reading,tenant,onClick}:{chamber:Chamber;reading?:
   <div className="grid grid-cols-3 border-y border-border py-4 text-xs"><State icon={Power} label="Compressor" value={reading?.compressor_on?"Ligado":"Desligado"} active={reading?.compressor_on}/><State icon={DoorClosed} altIcon={DoorOpen} label="Porta" value={reading?.door_open?"Aberta":"Fechada"} active={!reading?.door_open} alert={reading?.door_open}/><State icon={Snowflake} label="Degelo" value={reading?.defrost_on?"Ativo":"Inativo"} info={reading?.defrost_on}/></div>
   <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground"><span>{reading?`Atualizado ${new Date(reading.recorded_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`:"Sem telemetria"}</span><span className="flex items-center gap-1 font-semibold text-foreground transition group-hover:text-primary">Ver detalhes <ArrowRight className="h-3.5 w-3.5"/></span></div>
   </div></Card>}
+
 function State({icon:Icon,altIcon:Alt,label,value,active,alert,info}:{icon:typeof Power;altIcon?:typeof DoorOpen;label:string;value:string;active?:boolean;alert?:boolean;info?:boolean}){const I=alert&&Alt?Alt:Icon;const color=alert?"text-status-alert":info?"text-status-info":active?"text-status-ok":"text-muted-foreground";return <div className="flex flex-col items-center gap-1 border-r border-border last:border-0"><I className={`h-4 w-4 ${color}`}/><span className="text-[10px] text-muted-foreground">{label}</span><span className={`font-semibold ${color}`}>{value}</span></div>}
