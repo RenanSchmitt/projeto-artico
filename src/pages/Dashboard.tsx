@@ -31,7 +31,7 @@ export default function Dashboard(){
   const [tenants,setTenants]=useState<Tenant[]>([]),[chambers,setChambers]=useState<Chamber[]>([]);
   const [latest,setLatest]=useState<Record<string,Reading>>({}); const [filter,setFilter]=useState("all"); const [search,setSearch]=useState(""); const [isAdmin,setIsAdmin]=useState(false);
   
-  // Estado para controlar quais localizações estão expandidas (fechadas por padrão)
+  // Estado para controlar quais localizações estão expandidas
   const [expandedLocations, setExpandedLocations]=useState<Record<string, boolean>>({});
 
   useEffect(()=>{ if(loading||!user)return; let cancelled=false;
@@ -42,11 +42,6 @@ export default function Dashboard(){
       let tq=supabase.from("tenants").select("*").order("name"),cq=supabase.from("chambers").select("*").order("name");
       if(!admin){const id=tenantId||"bloqueado-sem-tenant";tq=tq.eq("id",id);cq=cq.eq("tenant_id",id)}
       const [{data:ts},{data:chs}]=await Promise.all([tq,cq]);if(cancelled)return;setTenants(ts??[]);setChambers(chs??[]);
-      
-      // Inicializa todas as localizações como fechadas por padrão
-      if(chs){
-        setExpandedLocations({});
-      }
 
       if(chs?.length){const ids=chs.map(c=>c.id);const {data:tel}=await supabase.from("telemetry").select("chamber_id, temperature, compressor_on, defrost_on, door_open, recorded_at").in("chamber_id",ids).order("recorded_at",{ascending:false});
         if(tel){const map:Record<string,Reading>={};for(const row of tel as Reading[])if(!map[row.chamber_id])map[row.chamber_id]=row;setLatest(map)}}
@@ -80,7 +75,11 @@ export default function Dashboard(){
   const totals=useMemo(()=>visible.reduce((acc,c)=>{acc[getStatus(c,latest[c.id])]++;return acc},{normal:0,warning:0,critical:0,offline:0}),[visible,latest]);
   
   const toggleLocation = (loc: string) => {
-    setExpandedLocations(prev => ({ ...prev, [loc]: !prev[loc] }));
+    setExpandedLocations(prev => {
+      // Se já foi alterado antes, inverte. Se não, como o padrão é aberto (true), o clique deve fechar (false).
+      const current = prev[loc] ?? true;
+      return { ...prev, [loc]: !current };
+    });
   };
 
   if(loading)return null;if(!user)return <Navigate to="/auth" replace/>;
@@ -135,9 +134,8 @@ export default function Dashboard(){
       
       <div className="space-y-4">
         {Object.entries(groupedByLocation).map(([locationName, locChambers]) => {
-          const isExpanded = expandedLocations[locationName] ?? false;
+          const isExpanded = expandedLocations[locationName] ?? true;
           
-          // Verifica se há algum freezer crítico dentro desta localização específica
           const hasCritical = locChambers.some(ch => getStatus(ch, latest[ch.id]) === "critical");
 
           return (
@@ -145,7 +143,7 @@ export default function Dashboard(){
               key={locationName} 
               className={`overflow-hidden border transition-colors ${
                 hasCritical 
-                  ? "border-status-alert/60 bg-status-alert/5 shadow-lg shadow-status-alert/1ak" 
+                  ? "border-status-alert/60 bg-status-alert/5 shadow-lg shadow-status-alert/10" 
                   : "border-border/60 bg-card/40"
               }`}
             >
